@@ -23,8 +23,8 @@ export function parseImageRefs(markdown: string): ImageRef[] {
   const results: ImageRef[] = []
   const lines = markdown.split('\n')
 
-  // 匹配 ![alt](url) 格式
-  const inlineRegex = /!\[([^\]]*)\]\((\S+?)\)/g
+  // 匹配 ![alt](url) 格式（支持路径含空格）
+  const inlineRegex = /!\[([^\]]*)\]\(([^)]+?)\)/g
   // 匹配 <img src="url"> 格式
   const htmlRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi
   // 匹配 YAML frontmatter 中的图片字段：cover/image/thumbnail/banner/featured_image/hero

@@ -1,9 +1,10 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem } from 'electron'
 import { join } from 'path'
 import { URL } from 'url'
 import { promises as fs } from 'fs'
 import { loadAdapters, findAdapter } from './services/plugin-loader'
 import { runMigration, backupFile, writeOutputFile } from './services/migrator'
+import { logger } from './services/logger'
 
 // 判断是否开发模式
 const isDev = process.argv.includes('--dev') || !app.isPackaged
@@ -48,7 +49,67 @@ function createWindow() {
   })
 }
 
+// ========== 中文应用菜单 ==========
+function setAppMenu() {
+  const menu = Menu.buildFromTemplate([
+    {
+      label: '文件',
+      submenu: [
+        { label: '的选择目录', click: () => { BrowserWindow.getFocusedWindow()?.webContents.send('menu:select-source') } },
+        { label: '选择输出目录', click: () => { BrowserWindow.getFocusedWindow()?.webContents.send('menu:select-output') } },
+        { type: 'separator' },
+        { label: '退出', role: 'quit', accelerator: 'Ctrl+Q' },
+      ],
+    },
+    {
+      label: '编辑',
+      submenu: [
+        { label: '撤销', role: 'undo', accelerator: 'Ctrl+Z' },
+        { label: '重做', role: 'redo', accelerator: 'Ctrl+Shift+Z' },
+        { type: 'separator' },
+        { label: '剪切', role: 'cut', accelerator: 'Ctrl+X' },
+        { label: '复制', role: 'copy', accelerator: 'Ctrl+C' },
+        { label: '粘贴', role: 'paste', accelerator: 'Ctrl+V' },
+        { label: '全选', role: 'selectAll', accelerator: 'Ctrl+A' },
+      ],
+    },
+    {
+      label: '视图',
+      submenu: [
+        { label: '重新加载', role: 'reload', accelerator: 'Ctrl+R' },
+        { label: '强制重新加载', role: 'forceReload', accelerator: 'Ctrl+Shift+R' },
+        { label: '开发者工具', role: 'toggleDevTools', accelerator: 'F12' },
+        { type: 'separator' },
+        { label: '实际大小', role: 'resetZoom', accelerator: 'Ctrl+0' },
+        { label: '放大', role: 'zoomIn', accelerator: 'Ctrl+=' },
+        { label: '缩小', role: 'zoomOut', accelerator: 'Ctrl+-' },
+        { type: 'separator' },
+        { label: '全屏', role: 'togglefullscreen', accelerator: 'F11' },
+      ],
+    },
+    {
+      label: '窗口',
+      submenu: [
+        { label: '最小化', role: 'minimize' },
+        { label: '最大化', role: 'zoom' },
+        { label: '关闭窗口', role: 'close' },
+      ],
+    },
+    {
+      label: '帮助',
+      submenu: [
+        { label: '关于 MDPicSync', click: () => {
+          const win = BrowserWindow.getFocusedWindow()
+          if (win) dialog.showMessageBox(win, { title: '关于 MDPicSync', message: 'MDPicSync v0.1.0\nMarkdown 图片备份迁移工具', buttons: ['确定'] })
+        }},
+      ],
+    },
+  ])
+  Menu.setApplicationMenu(menu)
+}
+
 app.whenReady().then(() => {
+  setAppMenu()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -90,12 +151,12 @@ async function scanDir(dir: string, results: Array<{ path: string; name: string;
 
 function countImages(md: string): number {
   let count = 0
-  // ![alt](url) 格式
-  const regex1 = /!\[.*?\]\((https?:\/\/.*?)\)/gi
+  // ![alt](url) 格式（支持路径含空格）
+  const regex1 = /!\[.*?\]\([^)]+\)/gi
   let m: RegExpExecArray | null
   while ((m = regex1.exec(md)) !== null) count++
   // <img src="url"> 格式
-  const regex2 = /<img[^>]+src=["'](https?:\/\/.*?)["']/gi
+  const regex2 = /<img[^>]+src=["'][^"']*["']/gi
   while ((m = regex2.exec(md)) !== null) count++
   return count
 }
@@ -138,7 +199,11 @@ ipcMain.handle('config:set', async (_event: any, key: string, value: any) => {
   await fs.writeFile(join(userDataPath, 'config.json'), JSON.stringify(config, null, 2), 'utf-8')
 })
 
-// ========== IPC：执行迁移（核心！）==========
+// ========== IPC：打开日志目录 ==========
+ipcMain.handle('app:openLogDir', async () => {
+  const logDir = logger.getLogDir()
+  shell.openPath(logDir)
+})
 // 前端通过这一调用触发真正的图片迁移
 // 参数：{ mdFiles, mode, adapterId, adapterConfig, outputDir }
 ipcMain.handle('migration:run', async (_event: any, opts: {
@@ -178,6 +243,8 @@ ipcMain.handle('migration:run', async (_event: any, opts: {
         adapterConfig,
         outputDir,
         (msg: string) => {
+          // 记录到日志文件
+          logger.info(msg)
           // 实时发送日志到渲染进程
           _event.sender.send('migration:log', msg)
         }

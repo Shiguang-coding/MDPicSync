@@ -32,6 +32,7 @@ try {
     removeMigrationLog: () => {
       ipcRenderer.removeAllListeners('migration:log')
     },
+    openLogDir: () => ipcRenderer.invoke('app:openLogDir'),
     log: (...args: any[]) => ipcRenderer.invoke('log', ...args),
   }
 

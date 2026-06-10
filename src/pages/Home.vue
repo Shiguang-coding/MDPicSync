@@ -3,9 +3,14 @@
     <!-- 顶部标题栏 -->
     <div class="page-header">
       <h2>📁 Markdown 图片迁移</h2>
-      <el-tag :type="mode === 'upload' ? 'primary' : 'success'" size="large">
-        {{ mode === 'upload' ? '📤 本地 → 图床' : '📥 图床 → 本地' }}
-      </el-tag>
+      <div class="header-actions">
+        <el-button size="small" @click="openLogDir">
+          📄 查看日志
+        </el-button>
+        <el-tag :type="mode === 'upload' ? 'primary' : 'success'" size="large">
+          {{ mode === 'upload' ? '📤 本地 → 图床' : '📥 图床 → 本地' }}
+        </el-tag>
+      </div>
     </div>
 
     <!-- 模式切换 -->
@@ -61,8 +66,8 @@
           </div>
         </div>
       </template>
-      <el-table :data="mdFiles" style="width:100%" max-height="280" stripe>
-        <el-table-column type="selection" width="45" />
+      <el-table ref="fileTableRef" :data="mdFiles" style="width:100%" max-height="280" stripe row-key="path" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="45" :reserve-selection="true" />
         <el-table-column prop="name" label="文件名" min-width="220" />
         <el-table-column label="图片数量" width="120" align="center">
           <template #default="{ row }">
@@ -117,7 +122,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Top, Bottom } from '@element-plus/icons-vue'
@@ -130,12 +135,14 @@ const outputDir = ref('')
 const activeAdapterId = ref('')
 const adapters = ref<any[]>([])
 const mdFiles = ref<any[]>([])
+const selectedRows = ref<any[]>([])  // 当前选中行（由 el-table selection-change 维护）
+const fileTableRef = ref<any>(null)  // el-table ref
 const isRunning = ref(false)
 const progress = ref(0)
 const logs = ref<string[]>([])
 
 const canExecute = computed(() =>
-  sourceDir.value && outputDir.value && activeAdapterId.value && mdFiles.value.some(f => f.selected)
+  sourceDir.value && outputDir.value && activeAdapterId.value && selectedRows.value.length > 0
 )
 
 onMounted(async () => {
@@ -178,10 +185,23 @@ async function scanFiles() {
   if (!sourceDir.value) return
   const files = await (window as any).electronAPI.scanMarkdownFiles(sourceDir.value)
   mdFiles.value = files.map((f: any) => ({ ...f, selected: true }))
+  // 等待 DOM 更新后全选表格行
+  nextTick(() => {
+    fileTableRef.value?.toggleAllSelection()
+  })
+}
+
+function handleSelectionChange(rows: any[]) {
+  selectedRows.value = rows
 }
 
 function selectAll(val: boolean) {
-  mdFiles.value.forEach(f => f.selected = val)
+  if (!fileTableRef.value) return
+  if (val) {
+    fileTableRef.value.toggleAllSelection()
+  } else {
+    fileTableRef.value.clearSelection()
+  }
 }
 
 function handleModeChange() {
@@ -220,6 +240,14 @@ async function copyLogs() {
   }
 }
 
+async function openLogDir() {
+  try {
+    await (window as any).electronAPI.openLogDir()
+  } catch (e: any) {
+    ElMessage.error('打开日志目录失败: ' + e.message)
+  }
+}
+
 async function startMigration() {
   isRunning.value = true
   progress.value = 0
@@ -232,7 +260,13 @@ async function startMigration() {
   addLog(`🔌 图床: ${activeAdapterId.value}`)
   addLog('')
 
-  const selectedFiles = mdFiles.value.filter(f => f.selected).map(f => f.path)
+  // 使用表格当前选中行，而非 f.selected（el-table type="selection" 不修改 row.selected）
+  const selectedFiles = selectedRows.value.map((row: any) => row.path)
+  if (selectedFiles.length === 0) {
+    ElMessage.warning('请至少选择一个文件')
+    isRunning.value = false
+    return
+  }
 
   try {
     // 监听主进程推送的实时日志
