@@ -130,11 +130,29 @@ async function saveConfig() {
 async function testConnection() {
   if (!selectedAdapterId.value) return
   testing.value = true
-  // TODO: 通过 IPC 调用适配器的 validateConfig 方法
-  setTimeout(() => {
+  try {
+    const api = (window as any).electronAPI
+    if (!api || !api.testConnection) {
+      ElMessage.error('IPC 接口未加载')
+      return
+    }
+    // ✅ 用 JSON 序列化确保传递的是纯对象（避免 Vue reactive 对象无法被克隆）
+    const plainConfig = JSON.parse(JSON.stringify(configValues.value))
+    const result = await api.testConnection(selectedAdapterId.value, plainConfig)
+    if (result?.ok) {
+      if (result?.warning) {
+        ElMessage.warning(result.warning)  // ⚠️ 显示警告
+      } else {
+        ElMessage.success('连接测试通过 ✅')
+      }
+    } else {
+      ElMessage.error('连接测试失败：' + (result?.error || '未知错误'))
+    }
+  } catch (e: any) {
+    ElMessage.error('连接测试异常：' + e.message)
+  } finally {
     testing.value = false
-    ElMessage.success('连接测试功能将在主进程 IPC 中实现')
-  }, 1000)
+  }
 }
 </script>
 

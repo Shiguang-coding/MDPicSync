@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem, clipboard, nativeImage } from 'electron'
 import { join } from 'path'
 import { URL } from 'url'
 import { promises as fs } from 'fs'
@@ -127,6 +127,18 @@ ipcMain.handle('dialog:selectDirectory', async () => {
   return result.filePaths[0]
 })
 
+// ========== IPC：文件选择（返回真实路径）==========
+ipcMain.handle('dialog:selectFiles', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: '图片', extensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'] },
+    ],
+  })
+  if (result.canceled) return []
+  return result.filePaths
+})
+
 // ========== IPC：扫描 MD 文件 ==========
 ipcMain.handle('fs:scanMarkdownFiles', async (_event: any, dirPath: string) => {
   const results: Array<{ path: string; name: string; imageCount: number }> = []
@@ -162,6 +174,14 @@ function countImages(md: string): number {
 }
 
 // ========== IPC：文件读写 ==========
+ipcMain.handle('fs:getFileStats', async (_event: any, filePath: string) => {
+  try {
+    const stats = await fs.stat(filePath)
+    return { size: stats.size, mtime: stats.mtime }
+  } catch {
+    return null
+  }
+})
 ipcMain.handle('fs:readFile', async (_event: any, filePath: string) => {
   return await fs.readFile(filePath, 'utf-8')
 })
@@ -204,6 +224,142 @@ ipcMain.handle('app:openLogDir', async () => {
   const logDir = logger.getLogDir()
   shell.openPath(logDir)
 })
+
+// ========== IPC：测试图床连接 ==========
+ipcMain.handle('config:testConnection', async (_event: any, adapterId: string, config: Record<string, string>) => {
+  try {
+    // 确保 config 是纯可序列化对象（避免 V8 克隆失败）
+    const plainConfig = JSON.parse(JSON.stringify(config || {}))
+
+    const adapters = await loadAdapters()
+    const adapter = findAdapter(adapters, adapterId)
+    if (!adapter) {
+      return { ok: false, error: '未知适配器: ' + adapterId }
+    }
+
+    if (typeof (adapter as any).validateConfig !== 'function') {
+      // 适配器未实现 validateConfig，默认返回 true
+      return { ok: true, error: '' }
+    }
+
+    const result = await (adapter as any).validateConfig(plainConfig)
+    return {
+      ok: result?.ok ?? false,
+      error: result?.error || '',
+      warning: result?.warning || '',
+    }
+  } catch (e: any) {
+    return { ok: false, error: String(e?.message || '连接测试异常') }
+  }
+})
+// ========== IPC：上传图片到图床 ==========
+ipcMain.handle('upload:images', async (_event: any, opts: {
+  filePaths: string[]
+  adapterId: string
+  adapterConfig: Record<string, string>
+}) => {
+  const { filePaths, adapterId, adapterConfig } = opts
+  const results: Array<{ success: boolean; url?: string; error?: string }> = []
+
+  try {
+    const adapters = await loadAdapters()
+    const adapter = findAdapter(adapters, adapterId)
+    if (!adapter) {
+      return filePaths.map(() => ({ success: false, error: `未找到图床适配器: ${adapterId}` }))
+    }
+
+    for (const filePath of filePaths) {
+      try {
+        const result = await adapter.upload(filePath, adapterConfig)
+        results.push({
+          success: result.success,
+          url: result.url || '',
+          error: result.error || '',
+        })
+      } catch (e: any) {
+        results.push({ success: false, error: e.message || '上传失败' })
+      }
+    }
+
+    return results
+  } catch (e: any) {
+    return filePaths.map(() => ({ success: false, error: e.message || '上传失败' }))
+  }
+})
+
+// ========== IPC：剪贴板图片读取 ==========
+ipcMain.handle('clipboard:readImage', async () => {
+  try {
+    const image = clipboard.readImage('clipboard')
+    if (image.isEmpty()) {
+      return { hasImage: false }
+    }
+    const buffer = image.toPNG()
+    const tempDir = join(app.getPath('temp'), 'mdpicsync-clipboard')
+    await fs.mkdir(tempDir, { recursive: true })
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const fileName = `clipboard-${timestamp}.png`
+    const tempPath = join(tempDir, fileName)
+    await fs.writeFile(tempPath, buffer)
+    return { hasImage: true, tempPath, name: fileName }
+  } catch (e: any) {
+    return { hasImage: false, error: e.message }
+  }
+})
+
+// ========== IPC：从 URL 下载图片 ==========
+ipcMain.handle('download:imageFromUrl', async (_event: any, url: string) => {
+  try {
+    const https = require('https')
+    const http = require('http')
+    const { URL } = require('url')
+    const parsed = new URL(url)
+
+    const client = parsed.protocol === 'https:' ? https : http
+
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
+      client.get(url, (res: any) => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}`))
+          return
+        }
+        const chunks: Buffer[] = []
+        res.on('data', (chunk: Buffer) => chunks.push(chunk))
+        res.on('end', () => resolve(Buffer.concat(chunks)))
+        res.on('error', reject)
+      }).on('error', reject)
+    })
+
+    // 根据 Content-Type 推断扩展名
+    const mimeToExt: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/jpg': 'jpg',
+      'image/png': 'png',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/bmp': 'bmp',
+      'image/svg+xml': 'svg',
+    }
+
+    let ext = 'png'
+    // 简单检查 magic bytes
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8) ext = 'jpg'
+    else if (buffer[0] === 0x89 && buffer[1] === 0x50) ext = 'png'
+    else if (buffer[0] === 0x47 && buffer[1] === 0x49) ext = 'gif'
+    else if (buffer[0] === 0x52 && buffer[1] === 0x49) ext = 'webp'
+
+    const tempDir = join(app.getPath('temp'), 'mdpicsync-url')
+    await fs.mkdir(tempDir, { recursive: true })
+    const fileName = `url-${Date.now()}.${ext}`
+    const tempPath = join(tempDir, fileName)
+    await fs.writeFile(tempPath, buffer)
+
+    return { success: true, tempPath, name: fileName, size: buffer.length }
+  } catch (e: any) {
+    return { success: false, error: e.message }
+  }
+})
+
 // 前端通过这一调用触发真正的图片迁移
 // 参数：{ mdFiles, mode, adapterId, adapterConfig, outputDir }
 ipcMain.handle('migration:run', async (_event: any, opts: {

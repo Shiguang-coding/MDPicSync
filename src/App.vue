@@ -20,6 +20,10 @@
               <el-icon><Setting /></el-icon>
               <span>图床配置</span>
             </el-menu-item>
+            <el-menu-item index="/upload">
+              <el-icon><UploadFilled /></el-icon>
+              <span>图片上传</span>
+            </el-menu-item>
           </el-menu>
         </el-aside>
 
@@ -35,7 +39,7 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
-import { Upload, Setting, PictureFilled } from '@element-plus/icons-vue'
+import { Upload, Setting, PictureFilled, UploadFilled } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()

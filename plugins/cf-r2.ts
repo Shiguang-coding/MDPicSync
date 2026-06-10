@@ -4,7 +4,7 @@ import axios from 'axios'
 import https from 'https'
 import fs from 'fs/promises'
 import path from 'path'
-import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField } from './base-adapter'
+import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField, ValidateResult } from './base-adapter'
 
 export class CfR2Adapter implements IImageBedAdapter {
   id = 'cf-r2'
@@ -20,6 +20,21 @@ export class CfR2Adapter implements IImageBedAdapter {
 
   // 方案 B：连接复用
   private agent = new https.Agent({ keepAlive: true, maxSockets: 5 })
+
+  /**
+   * 测试连接：用 headBucket 验证 endpoint、credentials、bucket 是否有效
+   */
+  async validateConfig(config: Record<string, string>): Promise<ValidateResult> {
+    try {
+      const { HeadBucketCommand } = await import('@aws-sdk/client-s3')
+      const client = this.getClient(config)
+      await client.send(new HeadBucketCommand({ Bucket: config['bucketName'] }))
+      return { ok: true, warning: '' }
+    } catch (e: any) {
+      console.error('[cf-r2] validateConfig failed:', e.message)
+      return { ok: false, error: e.message ?? '连接测试异常' }
+    }
+  }
 
   private getClient(config: Record<string, string>) {
     return new S3Client({

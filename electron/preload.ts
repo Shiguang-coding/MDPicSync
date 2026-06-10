@@ -5,6 +5,8 @@ console.log('[PRELOAD] Script started')
 try {
   const api = {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
+    selectFiles: () => ipcRenderer.invoke('dialog:selectFiles'),
+    getFileStats: (filePath: string) => ipcRenderer.invoke('fs:getFileStats', filePath),
     scanMarkdownFiles: (dirPath: string) =>
       ipcRenderer.invoke('fs:scanMarkdownFiles', dirPath),
     readFile: (filePath: string) =>
@@ -33,6 +35,15 @@ try {
       ipcRenderer.removeAllListeners('migration:log')
     },
     openLogDir: () => ipcRenderer.invoke('app:openLogDir'),
+    testConnection: (adapterId: string, config: Record<string, string>) =>
+      ipcRenderer.invoke('config:testConnection', adapterId, config),
+    uploadImages: (opts: {
+      filePaths: string[]
+      adapterId: string
+      adapterConfig: Record<string, string>
+    }) => ipcRenderer.invoke('upload:images', opts),
+    readClipboardImage: () => ipcRenderer.invoke('clipboard:readImage'),
+    downloadImageFromUrl: (url: string) => ipcRenderer.invoke('download:imageFromUrl', url),
     log: (...args: any[]) => ipcRenderer.invoke('log', ...args),
   }
 

@@ -1,4 +1,4 @@
-import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField } from './base-adapter'
+import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField, ValidateResult } from './base-adapter'
 import axios from 'axios'
 import fs from 'fs/promises'
 import path from 'path'
@@ -18,26 +18,29 @@ export class LskyProAdapter implements IImageBedAdapter {
   // 方案 B：连接复用
   private agent = new https.Agent({ keepAlive: true, maxSockets: 5 })
 
-  async validateConfig(config: Record<string, string>): Promise<boolean> {
+  async validateConfig(config: Record<string, string>): Promise<ValidateResult> {
     try {
-          const res = await axios.post(`${config['apiUrl']}/tokens`, {
-            email: config['email'],
-            password: config['password'],
-          }, { httpsAgent: this.agent })
+      const res = await axios.post(`${config['apiUrl']}/tokens`, {
+        email: config['email'],
+        password: config['password'],
+      }, { httpsAgent: this.agent })
       // Lsky Pro 返回格式: {"status":true,"data":{"token":"..."}}
-      this.token = res.data?.data?.token ?? res.data?.token ?? null
-      return !!this.token
+      const token = res.data?.data?.token ?? res.data?.token ?? null
+      if (!token) return { ok: false, error: '登录成功但未获取到 token，服务端返回格式异常' }
+      this.token = token
+      return { ok: true, warning: '' }
     } catch (e: any) {
       console.error('[lsky-pro] Login failed:', e.message)
-      return false
+      const errMsg = e.response?.data?.message ?? e.message ?? '未知错误'
+      return { ok: false, error: `登录失败: ${errMsg}` }
     }
   }
 
   async upload(filePath: string, config: Record<string, string>): Promise<ImageUploadResult> {
     try {
       if (!this.token) {
-        const valid = await this.validateConfig(config)
-        if (!valid) return { success: false, error: '登录失败，请检查配置' }
+        const validResult = await this.validateConfig(config)
+        if (!validResult?.ok) return { success: false, error: '登录失败，请检查配置' }
       }
 
       const FormData = (await import('form-data')).default

@@ -18,6 +18,13 @@ export interface ImageDownloadResult {
   error?: string
 }
 
+/** 连接测试结果（扩展版，支持警告信息） */
+export interface ValidateResult {
+  ok: boolean
+  error?: string
+  warning?: string  // 警告（如"服务端未启用鉴权"）
+}
+
 export interface IImageBedAdapter {
   /** 图床唯一标识 */
   id: string
@@ -48,7 +55,8 @@ export interface IImageBedAdapter {
   ): Promise<ImageDownloadResult>
 
   /**
-   * 验证配置是否有效（可选实现，默认返回 true）
+   * 验证配置是否有效（可选实现，默认返回 { ok: true }）
+   * 返回 ValidateResult，支持 warning 字段
    */
-  validateConfig?(config: Record<string, string>): Promise<boolean>
+  validateConfig?(config: Record<string, string>): Promise<ValidateResult>
 }

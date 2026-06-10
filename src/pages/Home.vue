@@ -310,6 +310,11 @@ async function startMigration() {
   align-items: center;
   margin-bottom: 20px;
 }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .page-header h2 {
   margin: 0;
   color: #e0e0e0;

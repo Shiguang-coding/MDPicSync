@@ -56,3 +56,5 @@ coverage/
 
 # WorkBuddy
 .workbuddy/
+test-electron.js
+test-electron2.js

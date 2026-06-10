@@ -2,7 +2,7 @@ import axios from 'axios'
 import fs from 'fs/promises'
 import path from 'path'
 import https from 'https'
-import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField } from './base-adapter'
+import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField, ValidateResult } from './base-adapter'
 
 // 全局共用 HTTP Agent（方案 B：连接复用）
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 5 })
@@ -15,6 +15,100 @@ export class CfImgbedAdapter implements IImageBedAdapter {
     { key: 'apiUrl', label: 'API 地址', type: 'text', placeholder: 'https://imgbed.example.com/upload', required: true },
     { key: 'authCode', label: '鉴权码 (Auth Code)', type: 'password', required: false },
   ]
+
+  /**
+   * 测试连接：用 1x1 像素 PNG 真正尝试上传，验证 apiUrl + authCode 是否有效
+   * 同时检测服务端是否未启用鉴权（即不带 authCode 也能上传成功）
+   */
+  async validateConfig(config: Record<string, string>): Promise<ValidateResult> {
+    try {
+      const apiUrl = config['apiUrl']
+      if (!apiUrl) return { ok: false, error: 'API 地址不能为空' }
+
+      // 校验 URL 格式
+      const url = new URL(apiUrl)
+
+      // 构造一个 1x1 像素 PNG 的 Buffer（最小合法图片）
+      const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWgqbpQAAAABJRU5ErkJggg=='
+      const pngBuffer = Buffer.from(pngBase64, 'base64')
+
+      const FormData = (await import('form-data')).default
+
+      // --- 第一次请求：带 authCode（如果有）---
+      const form1 = new FormData()
+      form1.append('file', pngBuffer, 'test-connect.png')
+
+      const headers1: Record<string, string> = { ...form1.getHeaders() }
+      if (config['authCode']) {
+        headers1['Authorization'] = config['authCode']
+      }
+
+      const res1 = await axios.post(apiUrl, form1, {
+        headers: headers1,
+        timeout: 8000,
+        validateStatus: () => true,
+        httpsAgent,
+      })
+
+      // 网络层失败
+      if (res1.status === 0) return { ok: false, error: '无法连接到服务器' }
+
+      // 解析第一次请求结果
+      const uploaded1 = this._hasValidUrl(res1.data)
+
+      // 4xx/5xx：配置有误
+      if (res1.status >= 400) return { ok: false, error: `服务器返回错误状态码: ${res1.status}` }
+
+      // 2xx 但没有有效 URL，说明服务端返回了错误格式
+      if (res1.status >= 200 && res1.status < 300 && !uploaded1) {
+        return { ok: false, error: '上传测试失败，服务端返回格式异常' }
+      }
+
+      // 到这里说明第一次请求成功
+      // --- 第二次请求：不带 authCode，检测服务端是否未启用鉴权 ---
+      const hasAuthCode = !!(config['authCode'] && String(config['authCode']).trim())
+      let warning = ''
+
+      if (hasAuthCode) {
+        const form2 = new FormData()
+        form2.append('file', pngBuffer, 'test-connect-no-auth.png')
+
+        const headers2: Record<string, string> = { ...form2.getHeaders() }
+        // 故意不传 Authorization
+
+        try {
+          const res2 = await axios.post(apiUrl, form2, {
+            headers: headers2,
+            timeout: 8000,
+            validateStatus: () => true,
+            httpsAgent,
+          })
+
+          const uploaded2 = this._hasValidUrl(res2.data)
+          // 不带 authCode 也能成功 → 服务端未启用鉴权
+          if (res2.status >= 200 && res2.status < 300 && uploaded2) {
+            warning = '警告：服务端未启用鉴权，您填写的鉴权码无效！请在服务端启用鉴权功能。'
+          }
+        } catch {
+          // 第二次请求失败是正常的（说明服务端启用了鉴权）
+        }
+      }
+
+      return { ok: true, warning }
+    } catch (e: any) {
+      console.error('[cf-imgbed] validateConfig failed:', e.message)
+      return { ok: false, error: e.message || '连接测试异常' }
+    }
+  }
+
+  /**
+   * 从响应体中提取是否有有效图片 URL
+   */
+  private _hasValidUrl(body: any): boolean {
+    if (Array.isArray(body) && body.length > 0 && body[0]?.src) return true
+    if (body?.src || body?.url || body?.data?.src || body?.data?.url || body?.link || body?.data?.link) return true
+    return false
+  }
 
   async upload(filePath: string, config: Record<string, string>): Promise<ImageUploadResult> {
     try {
