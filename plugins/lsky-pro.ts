@@ -2,6 +2,7 @@ import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfi
 import axios from 'axios'
 import fs from 'fs/promises'
 import path from 'path'
+import https from 'https'
 
 export class LskyProAdapter implements IImageBedAdapter {
   id = 'lsky-pro'
@@ -14,13 +15,15 @@ export class LskyProAdapter implements IImageBedAdapter {
   ]
 
   private token: string | null = null
+  // 方案 B：连接复用
+  private agent = new https.Agent({ keepAlive: true, maxSockets: 5 })
 
   async validateConfig(config: Record<string, string>): Promise<boolean> {
     try {
-      const res = await axios.post(`${config['apiUrl']}/tokens`, {
-        email: config['email'],
-        password: config['password'],
-      })
+          const res = await axios.post(`${config['apiUrl']}/tokens`, {
+            email: config['email'],
+            password: config['password'],
+          }, { httpsAgent: this.agent })
       // Lsky Pro 返回格式: {"status":true,"data":{"token":"..."}}
       this.token = res.data?.data?.token ?? res.data?.token ?? null
       return !!this.token
@@ -46,6 +49,7 @@ export class LskyProAdapter implements IImageBedAdapter {
           ...form.getHeaders(),
           Authorization: `Bearer ${this.token}`,
         },
+        httpsAgent: this.agent,
       })
 
       // Lsky Pro 返回格式: {"status":true,"data":{"links":{"url":"..."}}}
@@ -84,7 +88,7 @@ export class LskyProAdapter implements IImageBedAdapter {
     _config: Record<string, string>
   ): Promise<ImageDownloadResult> {
     try {
-      const res = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+      const res = await axios.get(imageUrl, { responseType: 'arraybuffer', httpsAgent: this.agent })
       const outPath = path.join(targetDir, fileName)
       await fs.writeFile(outPath, res.data)
       return { success: true, localPath: outPath }

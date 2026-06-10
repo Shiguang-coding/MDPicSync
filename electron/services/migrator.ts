@@ -15,7 +15,39 @@ export interface MigrationResult {
 export type LogCallback = (message: string) => void
 
 /**
- * 核心迁移引擎
+ * 并发控制映射（方案 A：并发上传）
+ * 最多同时处理 concurrency 个任务，避免图床限流
+ */
+async function mapConcurrent<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<PromiseSettledResult<R>[]> {
+  let idx = 0
+  const results: Promise<PromiseSettledResult<R>>[] = []
+
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++
+      try {
+        const value = await mapper(items[i], i)
+        results[i] = Promise.resolve({ status: 'fulfilled', value })
+      } catch (reason) {
+        results[i] = Promise.resolve({ status: 'rejected', reason })
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  )
+  await Promise.all(workers)
+  return Promise.all(results)
+}
+
+/**
+ * 核心迁移引擎（并发版）
  * mode: 'upload'   = 本地图片 → 图床
  * mode: 'download' = 图床图片 → 本地
  */
@@ -36,7 +68,7 @@ export async function runMigration(
     : imageRefs.filter(img => isRemoteImage(img.url))
 
   if (targetImages.length === 0) {
-    log(`   ⚠️  无需要处理的图片`)
+    log(`   ⚠️ 无需要处理的图片`)
     return {
       mdFile: mdFilePath,
       totalImages: 0,
@@ -50,12 +82,57 @@ export async function runMigration(
   log(`   找到 ${targetImages.length} 张需要处理的图片`)
 
   const mdName = path.basename(mdFilePath, '.md')
-  // download 模式：图片保存到 outputDir/mdName/ 目录
   const imageDir = mode === 'download' ? getImageOutputDir(mdFilePath, outputDir) : ''
   if (imageDir) {
     await fs.mkdir(imageDir, { recursive: true })
   }
 
+  // 并发处理（方案 A）
+  const CONCURRENCY = 3
+
+  const results = await mapConcurrent(
+    targetImages,
+    CONCURRENCY,
+    async (img, index) => {
+      log(`   [${index + 1}/${targetImages.length}] ${img.url}`)
+
+      try {
+        let replacement = ''
+
+        if (mode === 'upload') {
+          const localPath = path.resolve(path.dirname(mdFilePath), img.url)
+          log(`      本地路径: ${localPath}`)
+
+          const result = await adapter.upload(localPath, adapterConfig)
+          if (!result.success || !result.url) {
+            throw new Error(result.error ?? '上传失败，未返回 URL')
+          }
+
+          replacement = buildReplacement(img, result.url, mdFilePath)
+          log(`      ✅ 上传成功: ${result.url}`)
+        } else {
+          const ext = path.extname(new URL(img.url).pathname) || '.png'
+          const newFileName = generateImageFileName(path.basename(new URL(img.url).pathname), index)
+          const result = await adapter.download(img.url, imageDir, newFileName, adapterConfig)
+
+          if (!result.success || !result.localPath) {
+            throw new Error(result.error ?? '下载失败')
+          }
+
+          const posixPath = mdName + '/' + newFileName.replace(/\\/g, '/')
+          replacement = buildReplacement(img, posixPath, mdFilePath)
+          log(`      ✅ 下载成功: ${posixPath}`)
+        }
+
+        return { originalRaw: img.raw, replacement }
+      } catch (e: any) {
+        log(`      ❌ 处理失败: ${e.message}`)
+        throw e
+      }
+    }
+  )
+
+  // 应用替换
   let newContent = content
   const details: MigrationResult['details'] = []
   let successCount = 0
@@ -63,49 +140,14 @@ export async function runMigration(
 
   for (let i = 0; i < targetImages.length; i++) {
     const img = targetImages[i]
-    log(`   [${i + 1}/${targetImages.length}] ${img.url}`)
+    const result = results[i]
 
-    try {
-      let replacement = ''
-
-      if (mode === 'upload') {
-        // 本地 → 图床：localPath 基于【源 md 文件所在目录】解析
-        const localPath = path.resolve(path.dirname(mdFilePath), img.url)
-        log(`      本地路径: ${localPath}`)
-
-        const result = await adapter.upload(localPath, adapterConfig)
-        if (!result.success || !result.url) {
-          throw new Error(result.error ?? '上传失败，未返回 URL')
-        }
-
-        replacement = buildReplacement(img, result.url, mdFilePath)
-        log(`      ✅ 上传成功: ${result.url}`)
-        details.push({ url: img.url, status: 'success', newUrl: result.url })
-        successCount++
-
-      } else {
-        // 图床 → 本地：图片下载到 outputDir/mdName/ 目录
-        const ext = path.extname(new URL(img.url).pathname) || '.png'
-        const newFileName = generateImageFileName(path.basename(new URL(img.url).pathname), i)
-        const result = await adapter.download(img.url, imageDir, newFileName, adapterConfig)
-
-        if (!result.success || !result.localPath) {
-          throw new Error(result.error ?? '下载失败')
-        }
-
-        // 引用路径：mdName/xxx.ext（与输出 md 同级，保留原始后缀）
-        const posixPath = mdName + '/' + newFileName.replace(/\\/g, '/')
-
-        replacement = buildReplacement(img, posixPath, mdFilePath)
-        log(`      ✅ 下载成功: ${posixPath}`)
-        details.push({ url: img.url, status: 'success', newUrl: posixPath })
-        successCount++
-      }
-
-      newContent = newContent.replace(img.raw, replacement)
-    } catch (e: any) {
-      log(`      ❌ 处理失败: ${e.message}`)
-      details.push({ url: img.url, status: 'failed', error: e.message })
+    if (result.status === 'fulfilled') {
+      newContent = newContent.replace(result.value.originalRaw, result.value.replacement)
+      details.push({ url: img.url, status: 'success', newUrl: result.value.replacement })
+      successCount++
+    } else {
+      details.push({ url: img.url, status: 'failed', error: (result.reason as Error)?.message ?? String(result.reason) })
       failCount++
     }
   }
@@ -128,8 +170,6 @@ export async function runMigration(
 function buildReplacement(img: ReturnType<typeof parseImageRefs>[number], newUrl: string, mdFilePath: string): string {
   switch (img.type) {
     case 'frontmatter':
-      // frontmatter 格式：field: 'url' 或 field: url
-      // 保留原始引号风格
       const original = img.raw
       const hasQuotes = original.includes(`'${img.url}'`) || original.includes(`"${img.url}"`)
       if (hasQuotes) {
@@ -139,12 +179,10 @@ function buildReplacement(img: ReturnType<typeof parseImageRefs>[number], newUrl
       return `${img.field}: ${newUrl}`
 
     case 'html':
-      // HTML <img> 标签，替换 src 属性
       return img.raw.replace(img.url, newUrl)
 
     case 'inline':
     default:
-      // 标准 Markdown: ![alt](url)
       return `![${img.alt}](${newUrl})`
   }
 }

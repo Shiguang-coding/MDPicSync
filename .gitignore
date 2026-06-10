@@ -11,6 +11,7 @@ dist-electron/
 # Electron builder output
 out/
 dist_electron/
+release/
 
 # Environment files
 .env

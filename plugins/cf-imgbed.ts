@@ -1,7 +1,11 @@
 import axios from 'axios'
 import fs from 'fs/promises'
 import path from 'path'
+import https from 'https'
 import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField } from './base-adapter'
+
+// 全局共用 HTTP Agent（方案 B：连接复用）
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 5 })
 
 export class CfImgbedAdapter implements IImageBedAdapter {
   id = 'cf-imgbed'
@@ -34,7 +38,7 @@ export class CfImgbedAdapter implements IImageBedAdapter {
         headers['Authorization'] = config['authCode']
       }
 
-      const res = await axios.post(config['apiUrl'], form, { headers })
+      const res = await axios.post(config['apiUrl'], form, { headers, httpsAgent })
 
       // 调试：打印完整响应
       console.log('[cf-imgbed] 完整响应:', JSON.stringify(res.data))
@@ -77,7 +81,7 @@ export class CfImgbedAdapter implements IImageBedAdapter {
     _config: Record<string, string>
   ): Promise<ImageDownloadResult> {
     try {
-      const res = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+      const res = await axios.get(imageUrl, { responseType: 'arraybuffer', httpsAgent })
       const outPath = path.join(targetDir, fileName)
       await fs.writeFile(outPath, res.data)
       return { success: true, localPath: outPath }

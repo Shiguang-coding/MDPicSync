@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import axios from 'axios'
+import https from 'https'
 import fs from 'fs/promises'
 import path from 'path'
 import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField } from './base-adapter'
@@ -16,6 +17,9 @@ export class CfR2Adapter implements IImageBedAdapter {
     { key: 'bucketName', label: 'Bucket 名称', type: 'text', required: true },
     { key: 'publicUrl', label: '公开访问 URL', type: 'text', placeholder: 'https://pub-xxx.r2.dev', required: true },
   ]
+
+  // 方案 B：连接复用
+  private agent = new https.Agent({ keepAlive: true, maxSockets: 5 })
 
   private getClient(config: Record<string, string>) {
     return new S3Client({
@@ -58,7 +62,7 @@ export class CfR2Adapter implements IImageBedAdapter {
     config: Record<string, string>
   ): Promise<ImageDownloadResult> {
     try {
-      const res = await axios.get(imageUrl, { responseType: 'arraybuffer' })
+      const res = await axios.get(imageUrl, { responseType: 'arraybuffer', httpsAgent: this.agent })
       const outPath = path.join(targetDir, fileName)
       await fs.writeFile(outPath, res.data)
       return { success: true, localPath: outPath }
