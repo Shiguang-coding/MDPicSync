@@ -1,0 +1,29 @@
+appId: com.mdpicsync.app
+productName: MDPicSync
+directories:
+  output: release
+  buildResources: public
+
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - plugins/**/*
+  - package.json
+  - index.html
+
+asar: false
+
+win:
+  target: nsis
+  icon: public/icon.ico
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: MDPicSync
+
+publish:
+  - provider: generic
+    url: https://your-update-server.com/

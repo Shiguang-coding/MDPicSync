@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build outputs
+dist/
+dist-electron/
+.out/
+
+# Electron builder output
+out/
+dist_electron/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS files
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Electron native modules build
+node_modules/.cache/
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+*.tgz
+.npmrc
+
+# Vite
+*.local
+
+# WorkBuddy
+.workbuddy/
