@@ -15,7 +15,8 @@ export class CfR2Adapter implements IImageBedAdapter {
     { key: 'accessKey', label: 'Access Key ID', type: 'text', required: true },
     { key: 'secretKey', label: 'Secret Access Key', type: 'password', required: true },
     { key: 'bucketName', label: 'Bucket 名称', type: 'text', required: true },
-    { key: 'publicUrl', label: '公开访问 URL', type: 'text', placeholder: 'https://pub-xxx.r2.dev', required: true },
+    { key: 'publicUrl', label: '公开访问 URL', type: 'text', placeholder: 'https://pub-xxx.r2.dev 或 https://img.example.com', required: true },
+    { key: 'pathPrefix', label: '上传路径前缀', type: 'text', placeholder: 'md-images（留空则为根目录）', required: false },
   ]
 
   // 方案 B：连接复用
@@ -52,7 +53,8 @@ export class CfR2Adapter implements IImageBedAdapter {
       const client = this.getClient(config)
       const fileBuffer = await fs.readFile(filePath)
       const fileName = path.basename(filePath)
-      const key = `md-images/${Date.now()}-${fileName}`
+      const prefix = (config['pathPrefix'] || 'md-images').replace(/^\/+|\/+$/g, '')
+      const key = prefix ? `${prefix}/${Date.now()}-${fileName}` : `${Date.now()}-${fileName}`
 
       await client.send(
         new PutObjectCommand({
@@ -63,7 +65,9 @@ export class CfR2Adapter implements IImageBedAdapter {
         })
       )
 
-      const url = `${config['publicUrl'].replace(/\/$/, '')}/${key}`
+      const rawUrl = (config['publicUrl'] || '').replace(/\/+$/, '')
+      if (!rawUrl) return { success: false, error: '公开访问 URL 未配置，请在图床配置中填写' }
+      const url = `${rawUrl}/${key}`
       return { success: true, url }
     } catch (e: any) {
       return { success: false, error: e.message }

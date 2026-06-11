@@ -252,6 +252,22 @@ ipcMain.handle('config:testConnection', async (_event: any, adapterId: string, c
     return { ok: false, error: String(e?.message || '连接测试异常') }
   }
 })
+
+// ========== IPC：获取适配器列表（动态加载，带缓存）==========
+let _adaptersCache: any[] | null = null
+let _adaptersCacheTime = 0
+const ADAPTERS_CACHE_TTL = 30_000 // 30 秒缓存
+
+ipcMain.handle('adapters:list', async (_event: any) => {
+  const now = Date.now()
+  if (_adaptersCache && (now - _adaptersCacheTime) < ADAPTERS_CACHE_TTL) {
+    return _adaptersCache
+  }
+  const adapters = await loadAdapters()
+  _adaptersCache = adapters.map(a => ({ id: a.id, name: a.name, configFields: a.configFields }))
+  _adaptersCacheTime = now
+  return _adaptersCache
+})
 // ========== IPC：上传图片到图床 ==========
 ipcMain.handle('upload:images', async (_event: any, opts: {
   filePaths: string[]

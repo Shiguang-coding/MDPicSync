@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 interface AdapterInfo {
@@ -59,56 +59,53 @@ interface AdapterInfo {
   configFields: Array<{ key: string; label: string; type: string; placeholder?: string; required: boolean }>
 }
 
-const adapterList = ref<AdapterInfo[]>([
-  {
-    id: 'lsky-pro',
-    name: 'Lsky Pro (蓝空图床)',
-    configFields: [
-      { key: 'apiUrl', label: 'API 地址', type: 'text', placeholder: 'https://your-lsky.com/api/v1', required: true },
-      { key: 'email', label: '邮箱', type: 'text', required: true },
-      { key: 'password', label: '密码', type: 'password', required: true },
-    ],
-  },
-  {
-    id: 'cf-r2',
-    name: 'CloudFlare R2',
-    configFields: [
-      { key: 'endpoint', label: 'Endpoint', type: 'text', placeholder: 'https://xxx.r2.cloudflarestorage.com', required: true },
-      { key: 'accessKey', label: 'Access Key ID', type: 'text', required: true },
-      { key: 'secretKey', label: 'Secret Access Key', type: 'password', required: true },
-      { key: 'bucketName', label: 'Bucket 名称', type: 'text', required: true },
-      { key: 'publicUrl', label: '公开访问 URL', type: 'text', placeholder: 'https://pub-xxx.r2.dev', required: true },
-    ],
-  },
-  {
-    id: 'cf-imgbed',
-    name: 'CloudFlare ImgBed',
-    configFields: [
-      { key: 'apiUrl', label: 'API 地址', type: 'text', placeholder: 'https://imgbed.example.com/upload', required: true },
-      { key: 'authCode', label: '鉴权码 (Auth Code)', type: 'password', required: false },
-    ],
-  },
-])
-
+const adapterList = ref<AdapterInfo[]>([])
 const selectedAdapterId = ref('')
 const configValues = ref<Record<string, string>>({})
 const testing = ref(false)
+// 标记 onMounted 初始化是否完成，避免 watch 在初始化阶段重复加载配置
+let initialized = false
+
+async function loadAdapters() {
+  try {
+    adapterList.value = await (window as any).electronAPI.getAdapters()
+  } catch {
+    adapterList.value = []
+  }
+}
 
 const selectedAdapter = computed(() =>
   adapterList.value.find(a => a.id === selectedAdapterId.value)
 )
 
+/** 根据当前选中的适配器ID加载其已保存的配置，若无则重置为空 */
+async function loadConfigForAdapter(adapterId: string) {
+  if (!adapterId) {
+    configValues.value = {}
+    return
+  }
+  const saved = await (window as any).electronAPI.configGet(`adapter_${adapterId}`)
+  configValues.value = saved ?? {}
+}
+
+// 切换适配器时重新加载对应的配置
+watch(selectedAdapterId, async (newId) => {
+  if (!initialized) return // onMounted 阶段由其自行处理
+  await loadConfigForAdapter(newId)
+})
+
 onMounted(async () => {
+  await loadAdapters()
   // 加载已保存的配置
   for (const adapter of adapterList.value) {
     const saved = await (window as any).electronAPI.configGet(`adapter_${adapter.id}`)
     if (saved) {
-      // 找到上次使用的适配器
       selectedAdapterId.value = adapter.id
       configValues.value = saved
       break
     }
   }
+  initialized = true
 })
 
 async function saveConfig() {

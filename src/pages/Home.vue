@@ -51,7 +51,7 @@
             :value="adapter.id"
           />
         </el-select>
-        <el-button link type="primary" @click="goSettings">配置参数</el-button>
+        <el-button plain type="primary" size="small" @click="goSettings">⚙️ 配置参数</el-button>
       </div>
     </el-card>
 
@@ -146,6 +146,7 @@ const canExecute = computed(() =>
 )
 
 onMounted(async () => {
+  await loadAdapters()
   // 加载保存的配置
   const savedMode = await (window as any).electronAPI.configGet('mode')
   if (savedMode) mode.value = savedMode
@@ -155,14 +156,15 @@ onMounted(async () => {
   if (savedOutput) outputDir.value = savedOutput
   const savedAdapter = await (window as any).electronAPI.configGet('activeAdapter')
   if (savedAdapter) activeAdapterId.value = savedAdapter
-
-  // TODO: 从主进程加载适配器列表
-  adapters.value = [
-    { id: 'lsky-pro', name: 'Lsky Pro (蓝空图床)' },
-    { id: 'cf-r2', name: 'CloudFlare R2' },
-    { id: 'cf-imgbed', name: 'CloudFlare ImgBed' },
-  ]
 })
+
+async function loadAdapters() {
+  try {
+    adapters.value = await (window as any).electronAPI.getAdapters()
+  } catch {
+    adapters.value = []
+  }
+}
 
 async function selectSourceDir() {
   const path = await (window as any).electronAPI.selectDirectory()

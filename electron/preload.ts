@@ -44,6 +44,7 @@ try {
     }) => ipcRenderer.invoke('upload:images', opts),
     readClipboardImage: () => ipcRenderer.invoke('clipboard:readImage'),
     downloadImageFromUrl: (url: string) => ipcRenderer.invoke('download:imageFromUrl', url),
+    getAdapters: () => ipcRenderer.invoke('adapters:list'),
     log: (...args: any[]) => ipcRenderer.invoke('log', ...args),
   }
 

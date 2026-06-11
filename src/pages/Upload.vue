@@ -274,6 +274,8 @@ const canUpload = computed(() =>
 
 // ===== 生命周期 =====
 onMounted(async () => {
+  await loadAdapters()
+
   const savedAdapter = await (window as any).electronAPI.configGet('activeAdapter')
   if (savedAdapter) activeAdapterId.value = savedAdapter
 
@@ -283,15 +285,17 @@ onMounted(async () => {
   const savedTemplate = await (window as any).electronAPI.configGet('uploadCustomTemplate')
   if (savedTemplate) customTemplate.value = savedTemplate
 
-  adapters.value = [
-    { id: 'lsky-pro', name: 'Lsky Pro (蓝空图床)' },
-    { id: 'cf-r2', name: 'CloudFlare R2' },
-    { id: 'cf-imgbed', name: 'CloudFlare ImgBed' },
-  ]
-
   // 监听粘贴事件
   document.addEventListener('paste', onPaste)
 })
+
+async function loadAdapters() {
+  try {
+    adapters.value = await (window as any).electronAPI.getAdapters()
+  } catch {
+    adapters.value = []
+  }
+}
 
 onUnmounted(() => {
   document.removeEventListener('paste', onPaste)
@@ -657,9 +661,19 @@ async function startUpload() {
     const successCount = results.filter(r => r?.success).length
     const failCount = total - successCount
 
-    if (failCount === 0) {
-      ElMessage.success(`全部 ${successCount} 张图片上传成功！`)
-    } else {
+    // #5 上传成功自动复制（仅全部成功时）
+    if (failCount === 0 && successCount > 0) {
+      const urls = uploadResults.value
+        .filter(r => r.success && r.displayUrl)
+        .map(r => r.displayUrl!)
+        .join('\n')
+      try {
+        await navigator.clipboard.writeText(urls)
+        ElMessage.success(`全部 ${successCount} 张上传成功，链接已自动复制到剪贴板！`)
+      } catch {
+        ElMessage.success(`全部 ${successCount} 张上传成功！`)
+      }
+    } else if (failCount > 0) {
       ElMessage.warning(`${successCount} 张成功，${failCount} 张失败`)
     }
   } catch (e: any) {
