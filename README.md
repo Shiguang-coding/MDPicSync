@@ -6,6 +6,8 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Shiguang-coding/MDPicSync/blob/main/LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/Shiguang-coding/MDPicSync)
 
+> 本项目基于作者此前开发的 [MarkdownImageBackupTool](https://github.com/Shiguang-coding/MarkdownImageBackupTool)（Java 命令行版本），使用 Electron + Vue 3 重新构建为桌面应用，并扩展了插件化架构、图片上传、剪贴板粘贴等功能。
+
 ---
 
 ## 目录
@@ -369,4 +371,4 @@ MDPicSync/
 
 ## 致谢
 
-本项目灵感来源于 [MarkdownImageBackupTool](https://github.com/Shiguang-coding/MarkdownImageBackupTool)（Java 命令行工具），在此表示感谢。
+本项目脱胎于作者此前开发的 [MarkdownImageBackupTool](https://github.com/Shiguang-coding/MarkdownImageBackupTool)（Java 命令行版本），感谢其在 Markdown 图片迁移领域的早期探索与实践。
