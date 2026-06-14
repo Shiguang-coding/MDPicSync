@@ -2,7 +2,7 @@
 
 > Markdown 图片备份与双向迁移工具 | 基于 Electron + Vue 3 构建
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](https://github.com/Shiguang-coding/MDPicSync)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/Shiguang-coding/MDPicSync)
 [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Shiguang-coding/MDPicSync/blob/main/LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/Shiguang-coding/MDPicSync)
 
@@ -32,9 +32,11 @@
 | 特性 | 说明 |
 |------|------|
 | 双向迁移 | 本地图片 → 图床（上传）/ 图床图片 → 本地（下载），一键完成 |
+| 图片上传 | 支持拖拽、点击选择、剪贴板粘贴、URL 导入多种上传方式 |
 | 插件化架构 | 支持 Lsky Pro、CloudFlare R2、CloudFlare ImgBed，可自由扩展 |
 | 批量处理 | 自动递归扫描目录，批量处理所有 Markdown 文件 |
 | 智能归档 | 按文章名称分类存储图片，目录结构清晰 |
+| 多格式链接 | 生成 URL / Markdown / HTML / UBB / 自定义模板等格式链接 |
 | 实时日志 | 处理进度实时展示，支持一键复制，日志按日期自动存档 |
 | 原文件备份 | 处理前自动备份原文件（`.bak` 后缀），可随时回滚 |
 | 深色主题 | 现代化 UI 设计，护眼深色风格 |
@@ -167,6 +169,8 @@ npm install --omit=none
 
 ## 使用流程
 
+### 图片迁移
+
 ```
 ┌─────────────────────────────────────────────┐
 │  1. 选择模式                              │
@@ -184,6 +188,26 @@ npm install --omit=none
 ├─────────────────────────────────────────────┤
 │  5. 开始执行：一键批量处理                │
 │     └── 实时查看日志和进度条             │
+└─────────────────────────────────────────────┘
+```
+
+### 图片上传
+
+```
+┌─────────────────────────────────────────────┐
+│  1. 选择图床服务                          │
+├─────────────────────────────────────────────┤
+│  2. 选择图片                              │
+│     ├── 点击选择文件                      │
+│     ├── 拖拽文件到上传区域               │
+│     ├── Ctrl+V 粘贴剪贴板图片            │
+│     └── URL 导入远程图片                  │
+├─────────────────────────────────────────────┤
+│  3. 选择链接格式                          │
+│     └── URL / Markdown / HTML / UBB / 自定义 │
+├─────────────────────────────────────────────┤
+│  4. 开始上传                              │
+│     └── 上传完成自动复制链接到剪贴板     │
 └─────────────────────────────────────────────┘
 ```
 
@@ -330,10 +354,10 @@ MDPicSync/
 │   ├── App.vue               # 主布局
 │   ├── router.ts             # 路由配置
 │   ├── stores/               # Pinia 状态管理
-│   ├── pages/                # 页面
-│   │   ├── Home.vue          # 主页面（迁移操作）
-│   │   └── Settings.vue      # 图床配置页
-│   └── components/           # 通用组件
+│   └── pages/                # 页面
+│       ├── Home.vue          # 图片迁移页
+│       ├── Upload.vue        # 图片上传页
+│       └── Settings.vue      # 图床配置页
 ├── plugins/                  # 图床插件
 │   ├── base-adapter.ts       # 插件接口定义
 │   ├── lsky-pro.ts           # Lsky Pro 适配器
@@ -368,7 +392,3 @@ MDPicSync/
 [MIT License](https://github.com/Shiguang-coding/MDPicSync/blob/main/LICENSE)
 
 ---
-
-## 致谢
-
-本项目脱胎于作者此前开发的 [MarkdownImageBackupTool](https://github.com/Shiguang-coding/MarkdownImageBackupTool)（Java 命令行版本），感谢其在 Markdown 图片迁移领域的早期探索与实践。
