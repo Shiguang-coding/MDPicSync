@@ -1,20 +1,24 @@
 <template>
   <div class="upload-page">
-    <!-- 顶部标题栏 -->
+    <!-- Page Header -->
     <div class="page-header">
-      <h2>📤 图片上传</h2>
+      <div class="page-title-group">
+        <h1 class="page-title">图片上传</h1>
+        <p class="page-description">上传图片到图床，获取链接</p>
+      </div>
       <div class="header-actions">
-        <el-button size="small" @click="openLogDir">
-          📄 查看日志
+        <el-button size="small" @click="openLogDir" class="btn-ghost">
+          <el-icon><Document /></el-icon>
+          <span>查看日志</span>
         </el-button>
       </div>
     </div>
 
-    <!-- 图床选择 -->
-    <el-card class="adapter-card" shadow="never">
+    <!-- Image Host Selection -->
+    <div class="section-card">
+      <div class="section-label">图床服务</div>
       <div class="adapter-row">
-        <span class="dir-label">图床</span>
-        <el-select v-model="activeAdapterId" placeholder="请选择图床" style="width:300px">
+        <el-select v-model="activeAdapterId" placeholder="请选择图床" class="adapter-select">
           <el-option
             v-for="adapter in adapters"
             :key="adapter.id"
@@ -22,12 +26,15 @@
             :value="adapter.id"
           />
         </el-select>
-        <el-button plain type="primary" size="small" @click="goSettings">⚙️ 配置参数</el-button>
+        <el-button plain type="primary" size="default" @click="goSettings">
+          <el-icon><Setting /></el-icon>
+          <span>配置参数</span>
+        </el-button>
       </div>
-    </el-card>
+    </div>
 
-    <!-- 上传区域 + 快捷操作 -->
-    <el-card class="upload-card" shadow="never">
+    <!-- Upload Zone -->
+    <div class="section-card">
       <div
         class="upload-drop-zone"
         @click="selectFiles"
@@ -36,77 +43,80 @@
         @drop.prevent="onDrop"
         :class="{ 'is-dragover': isDragOver }"
       >
-        <el-icon :size="48" color="#409eff"><UploadFilled /></el-icon>
+        <div class="upload-icon">
+          <el-icon :size="32"><UploadFilled /></el-icon>
+        </div>
         <div class="upload-text">
-          <em>点击选择文件</em> 或拖拽文件到此处
+          点击选择文件 <span class="upload-divider">或</span> 拖拽到此处
         </div>
         <div class="upload-hint">
-          支持 jpg/png/gif/webp 等常见图片格式，可多选 · 也可直接 <kbd>Ctrl+V</kbd> 粘贴剪贴板图片
+          支持 jpg / png / gif / webp · 可多选 · 也可 <kbd>Ctrl+V</kbd> 粘贴
         </div>
       </div>
 
-      <!-- 快捷上传按钮 -->
-      <div class="quick-upload-bar">
-        <div class="quick-label">快捷上传</div>
-        <div class="quick-btns">
-          <el-button size="small" @click="pasteFromClipboard" :loading="pasting">
-            <el-icon><DocumentCopy /></el-icon> 剪贴板图片
-          </el-button>
-          <el-button size="small" @click="showUrlDialog = true">
-            <el-icon><Link /></el-icon> URL 上传
-          </el-button>
-        </div>
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <el-button size="small" @click="pasteFromClipboard" :loading="pasting" class="btn-ghost">
+          <el-icon><DocumentCopy /></el-icon>
+          <span>剪贴板图片</span>
+        </el-button>
+        <el-button size="small" @click="showUrlDialog = true" class="btn-ghost">
+          <el-icon><Link /></el-icon>
+          <span>URL 上传</span>
+        </el-button>
       </div>
-    </el-card>
+    </div>
 
-    <!-- 链接格式选择器 -->
-    <el-card class="format-card" shadow="never" v-if="uploadResults.length > 0">
-      <template #header>
-        <div class="format-header">
-          <span>🔗 链接格式</span>
-          <el-input
-            v-if="linkFormat === 'custom'"
-            v-model="customTemplate"
-            size="small"
-            style="width:300px"
-            placeholder="自定义模板：$fileName / $url / $ext"
-          />
-        </div>
-      </template>
+    <!-- Link Format Selector -->
+    <div class="section-card" v-if="uploadResults.length > 0">
+      <div class="section-header">
+        <div class="section-label">链接格式</div>
+        <el-input
+          v-if="linkFormat === 'custom'"
+          v-model="customTemplate"
+          size="small"
+          class="custom-template-input"
+          placeholder="$fileName / $url / $ext"
+        />
+      </div>
       <div class="format-selector">
         <el-radio-group v-model="linkFormat" size="small">
-          <el-radio-button label="url">URL</el-radio-button>
-          <el-radio-button label="markdown">Markdown</el-radio-button>
-          <el-radio-button label="html">HTML</el-radio-button>
-          <el-radio-button label="ubb">UBB</el-radio-button>
-          <el-radio-button label="custom">Custom</el-radio-button>
+          <el-radio-button value="url">URL</el-radio-button>
+          <el-radio-button value="markdown">Markdown</el-radio-button>
+          <el-radio-button value="html">HTML</el-radio-button>
+          <el-radio-button value="ubb">UBB</el-radio-button>
+          <el-radio-button value="custom">Custom</el-radio-button>
         </el-radio-group>
-        <div class="format-preview" v-if="linkFormat === 'custom'">
-          <span class="format-hint">可用变量：$url, $fileName, $ext</span>
+        <div class="format-hint" v-if="linkFormat === 'custom'">
+          可用变量：<code>$url</code> <code>$fileName</code> <code>$ext</code>
         </div>
       </div>
-    </el-card>
+    </div>
 
-    <!-- 已选文件列表 -->
-    <el-card class="file-card" shadow="never" v-if="fileList.length > 0">
-      <template #header>
-        <div class="file-header">
-          <span>📎 已选择 {{ fileList.length }} 个文件</span>
-          <div>
-            <el-button size="small" @click="clearFiles">清空列表</el-button>
-          </div>
+    <!-- File List -->
+    <div class="section-card" v-if="fileList.length > 0">
+      <div class="section-header">
+        <div class="section-label">待上传文件</div>
+        <div class="section-actions">
+          <span class="file-count">{{ fileList.length }} 个文件</span>
+          <el-button size="small" @click="clearFiles" class="btn-ghost">清空列表</el-button>
         </div>
-      </template>
+      </div>
       <el-table :data="fileList" style="width:100%" max-height="280" stripe>
         <el-table-column label="文件名" min-width="220" prop="name" />
         <el-table-column label="大小" width="120" align="center">
           <template #default="{ row }">
-            {{ formatFileSize(row.size) }}
+            <span class="file-size">{{ formatFileSize(row.size) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
+            <span 
+              class="status-badge"
+              :class="`status-${row.status}`"
+            >
+              {{ getStatusText(row.status) }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="100" align="center">
@@ -132,9 +142,9 @@
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
+    </div>
 
-    <!-- 上传按钮 -->
+    <!-- Upload Button -->
     <div class="action-bar">
       <el-button
         type="primary"
@@ -142,39 +152,46 @@
         :loading="isUploading"
         :disabled="!canUpload"
         @click="startUpload"
-        style="width:220px;height:44px;font-size:16px"
+        class="action-button"
       >
-        {{ isUploading ? '上传中...' : '🚀 开始上传' }}
+        <el-icon v-if="!isUploading"><CaretRight /></el-icon>
+        <span>{{ isUploading ? '上传中...' : '开始上传' }}</span>
       </el-button>
     </div>
 
-    <!-- 进度条 -->
-    <el-progress
-      v-if="isUploading"
-      :percentage="progress"
-      :stroke-width="12"
-      style="margin-top:16px"
-      color="linear-gradient(135deg, #409eff, #a855f7)"
-    />
+    <!-- Progress -->
+    <div class="progress-wrapper" v-if="isUploading">
+      <el-progress
+        :percentage="progress"
+        :stroke-width="6"
+        :show-text="false"
+        color="var(--accent-primary)"
+      />
+      <span class="progress-label">{{ progress }}%</span>
+    </div>
 
-    <!-- 上传结果 -->
-    <el-card class="result-card" shadow="never" v-if="uploadResults.length > 0">
-      <template #header>
-        <div class="file-header">
-          <span>✅ 上传结果</span>
-          <div>
-            <el-button size="small" @click="copyAllUrls">📋 复制全部{{ formatLabel }}</el-button>
-          </div>
+    <!-- Upload Results -->
+    <div class="section-card" v-if="uploadResults.length > 0">
+      <div class="section-header">
+        <div class="section-label">上传结果</div>
+        <div class="section-actions">
+          <el-button size="small" @click="copyAllUrls" class="btn-ghost">
+            <el-icon><DocumentCopy /></el-icon>
+            <span>复制全部 {{ formatLabel }}</span>
+          </el-button>
         </div>
-      </template>
+      </div>
       <div class="result-list">
         <div
           v-for="(result, index) in uploadResults"
           :key="index"
           class="result-item"
+          :class="{ 'result-error': !result.success }"
         >
-          <el-icon v-if="result.success" color="#67c23a" :size="16"><CircleCheckFilled /></el-icon>
-          <el-icon v-else color="#f56c6c" :size="16"><CircleCloseFilled /></el-icon>
+          <div class="result-status">
+            <el-icon v-if="result.success" color="var(--accent-success)" :size="16"><CircleCheckFilled /></el-icon>
+            <el-icon v-else color="var(--accent-error)" :size="16"><CircleCloseFilled /></el-icon>
+          </div>
           <span class="result-name">{{ result.fileName }}</span>
           <span v-if="result.success" class="result-url">
             <el-input v-model="result.displayUrl" size="small" readonly>
@@ -183,16 +200,16 @@
               </template>
             </el-input>
           </span>
-          <span v-else class="result-error">{{ result.error }}</span>
+          <span v-else class="result-error-text">{{ result.error }}</span>
         </div>
       </div>
-    </el-card>
+    </div>
 
-    <!-- URL 上传弹窗 -->
+    <!-- URL Upload Dialog -->
     <el-dialog
       v-model="showUrlDialog"
       title="URL 上传"
-      width="500px"
+      width="480px"
       :close-on-click-modal="false"
     >
       <div class="url-dialog-body">
@@ -203,7 +220,7 @@
           placeholder="输入图片 URL，每行一个&#10;支持 jpg/png/gif/webp 等格式"
         />
         <div class="url-hint">
-          提示：图片会先下载到本地临时目录，再上传到图床
+          图片会先下载到本地临时目录，再上传到图床
         </div>
       </div>
       <template #footer>
@@ -220,11 +237,11 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { UploadFilled, CircleCheckFilled, CircleCloseFilled, DocumentCopy, Link } from '@element-plus/icons-vue'
+import { UploadFilled, CircleCheckFilled, CircleCloseFilled, DocumentCopy, Link, Document, Setting, CaretRight } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
-// ===== 状态 =====
+// ===== State =====
 const activeAdapterId = ref('')
 const adapters = ref<any[]>([])
 const fileList = ref<Array<{
@@ -246,7 +263,7 @@ const uploadResults = ref<Array<{
   error?: string
 }>>([])
 
-// 链接格式
+// Link format
 const linkFormat = ref('markdown')
 const customTemplate = ref('![$fileName]($url)')
 const formatLabel = computed(() => {
@@ -260,19 +277,19 @@ const formatLabel = computed(() => {
   return labels[linkFormat.value] || '链接'
 })
 
-// URL 上传
+// URL upload
 const showUrlDialog = ref(false)
 const urlInput = ref('')
 const urlUploading = ref(false)
 
-// 剪贴板
+// Clipboard
 const pasting = ref(false)
 
 const canUpload = computed(() =>
   activeAdapterId.value && fileList.value.length > 0 && !isUploading.value
 )
 
-// ===== 生命周期 =====
+// ===== Lifecycle =====
 onMounted(async () => {
   await loadAdapters()
 
@@ -285,7 +302,6 @@ onMounted(async () => {
   const savedTemplate = await (window as any).electronAPI.configGet('uploadCustomTemplate')
   if (savedTemplate) customTemplate.value = savedTemplate
 
-  // 监听粘贴事件
   document.addEventListener('paste', onPaste)
 })
 
@@ -301,7 +317,6 @@ onUnmounted(() => {
   document.removeEventListener('paste', onPaste)
 })
 
-// 保存格式偏好
 watch(linkFormat, async (v) => {
   await (window as any).electronAPI.configSet('uploadLinkFormat', v)
 })
@@ -310,7 +325,6 @@ watch(customTemplate, async (v) => {
   await (window as any).electronAPI.configSet('uploadCustomTemplate', v)
 })
 
-// 上传结果变化时，更新格式化显示链接
 watch([uploadResults, linkFormat, customTemplate], () => {
   for (const r of uploadResults.value) {
     if (r.success && r.url) {
@@ -319,7 +333,7 @@ watch([uploadResults, linkFormat, customTemplate], () => {
   }
 }, { deep: true })
 
-// ===== 链接格式化 =====
+// ===== Link Formatting =====
 function formatLink(url: string, fileName: string): string {
   const ext = fileName.split('.').pop() || ''
   const templateMap: Record<string, string> = {
@@ -336,7 +350,7 @@ function formatLink(url: string, fileName: string): string {
     .replace(/\$ext/g, ext)
 }
 
-// ===== 文件选择 =====
+// ===== File Selection =====
 async function selectFiles() {
   try {
     const paths = await (window as any).electronAPI.selectFiles()
@@ -422,19 +436,9 @@ function formatFileSize(bytes: number): string {
   return (bytes / 1024 / 1024).toFixed(1) + ' MB'
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
-    pending: 'info',
-    uploading: '',
-    success: 'success',
-    error: 'danger',
-  }
-  return map[status] || 'info'
-}
-
 function getStatusText(status: string) {
   const map: Record<string, string> = {
-    pending: '等待上传',
+    pending: '等待中',
     uploading: '上传中',
     success: '成功',
     error: '失败',
@@ -442,13 +446,12 @@ function getStatusText(status: string) {
   return map[status] || '未知'
 }
 
-// ===== 剪贴板上传 =====
+// ===== Clipboard =====
 async function pasteFromClipboard() {
   await doPaste()
 }
 
 async function onPaste(e: ClipboardEvent) {
-  // 如果正在编辑输入框，不拦截
   const target = e.target as HTMLElement
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
     return
@@ -472,7 +475,6 @@ async function doPaste() {
     addFiles([result.tempPath])
     ElMessage.success('已从剪贴板添加图片: ' + result.name)
 
-    // 如果已选择图床，自动开始上传
     if (activeAdapterId.value) {
       setTimeout(() => startUpload(), 300)
     }
@@ -483,7 +485,7 @@ async function doPaste() {
   }
 }
 
-// ===== URL 上传 =====
+// ===== URL Upload =====
 async function uploadFromUrls() {
   const urls = urlInput.value
     .split('\n')
@@ -525,7 +527,6 @@ async function uploadFromUrls() {
     showUrlDialog.value = false
     urlInput.value = ''
 
-    // 如果已选择图床且有新文件，自动开始上传
     if (addedPaths.length > 0 && activeAdapterId.value) {
       setTimeout(() => startUpload(), 300)
     }
@@ -534,7 +535,7 @@ async function uploadFromUrls() {
   }
 }
 
-// ===== 复制 =====
+// ===== Copy =====
 async function copyUrl(url: string) {
   if (!url) return
   try {
@@ -576,7 +577,7 @@ async function copyAllUrls() {
   }
 }
 
-// ===== 上传 =====
+// ===== Upload =====
 async function startUpload() {
   if (!activeAdapterId.value) {
     ElMessage.warning('请先选择图床')
@@ -661,7 +662,6 @@ async function startUpload() {
     const successCount = results.filter(r => r?.success).length
     const failCount = total - successCount
 
-    // #5 上传成功自动复制（仅全部成功时）
     if (failCount === 0 && successCount > 0) {
       const urls = uploadResults.value
         .filter(r => r.success && r.displayUrl)
@@ -683,7 +683,7 @@ async function startUpload() {
   }
 }
 
-// ===== 其他 =====
+// ===== Other =====
 async function openLogDir() {
   try {
     await (window as any).electronAPI.openLogDir()
@@ -699,183 +699,328 @@ function goSettings() {
 
 <style scoped>
 .upload-page {
-  max-width: 960px;
+  max-width: 900px;
   margin: 0 auto;
 }
 
+/* ===== Page Header ===== */
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-start;
+  margin-bottom: 28px;
 }
 
-.page-header h2 {
+.page-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-title {
   margin: 0;
-  color: #e0e0e0;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
 }
 
-.adapter-card,
-.upload-card,
-.file-card,
-.result-card,
-.format-card {
-  background: #1a1a2e !important;
-  border: 1px solid #2a2a3e !important;
-  color: #e0e0e0;
+.page-description {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ===== Section Cards ===== */
+.section-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
   margin-bottom: 16px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 12px;
+}
+
+.section-header .section-label {
+  margin-bottom: 0;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+/* ===== Adapter Row ===== */
 .adapter-row {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.dir-label {
-  min-width: 70px;
-  color: #a0a0b8;
-  font-size: 14px;
+.adapter-select {
+  flex: 1;
+  max-width: 400px;
 }
 
+/* ===== Upload Zone ===== */
 .upload-drop-zone {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 50px 20px;
-  border: 2px dashed #409eff44;
-  border-radius: 8px;
+  padding: 48px 24px;
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 0.3s;
-  background: #0d0d1a;
+  transition: all 0.2s ease;
+  background: var(--bg-base);
 }
 
-.upload-drop-zone:hover,
+.upload-drop-zone:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-subtle);
+}
+
 .upload-drop-zone.is-dragover {
-  border-color: #409eff;
-  background: #409eff0a;
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-subtle);
+  transform: scale(1.01);
+}
+
+.upload-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-primary-subtle);
+  border-radius: 50%;
+  color: var(--accent-primary);
+  margin-bottom: 16px;
 }
 
 .upload-text {
-  margin-top: 16px;
-  font-size: 16px;
-  color: #c0c0d8;
+  font-size: 15px;
+  color: var(--text-secondary);
 }
 
-.upload-text em {
-  color: #409eff;
-  font-style: normal;
-  font-weight: 600;
+.upload-divider {
+  color: var(--text-muted);
+  margin: 0 4px;
 }
 
 .upload-hint {
   margin-top: 8px;
-  font-size: 12px;
-  color: #6c6c8a;
+  font-size: 12.5px;
+  color: var(--text-muted);
 }
 
 .upload-hint kbd {
-  background: #2a2a3e;
-  border: 1px solid #3a3a5e;
-  border-radius: 3px;
-  padding: 1px 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 2px 6px;
   font-size: 11px;
-  color: #a0a0c0;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-secondary);
 }
 
-.quick-upload-bar {
+.quick-actions {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #2a2a3e;
-}
-
-.quick-label {
-  font-size: 13px;
-  color: #8a8aa0;
-}
-
-.quick-btns {
-  display: flex;
   gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
 }
 
-.format-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #e0e0e0;
+/* ===== Format Selector ===== */
+.custom-template-input {
+  max-width: 280px;
 }
 
 .format-selector {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.format-preview {
-  font-size: 12px;
-  color: #8a8aa0;
+  gap: 12px;
 }
 
 .format-hint {
-  background: #0d0d1a;
-  padding: 4px 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.format-hint code {
+  background: var(--bg-elevated);
+  padding: 2px 6px;
   border-radius: 4px;
-  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  color: var(--accent-primary);
 }
 
-.file-header {
-  display: flex;
-  justify-content: space-between;
+/* ===== Table Enhancements ===== */
+.file-size {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.status-badge {
+  display: inline-flex;
   align-items: center;
-  color: #e0e0e0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
-.result-card {
-  margin-top: 16px;
+.status-pending {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
 }
 
+.status-uploading {
+  background: var(--accent-primary-subtle);
+  color: var(--accent-primary);
+}
+
+.status-success {
+  background: var(--accent-success-subtle);
+  color: var(--accent-success);
+}
+
+.status-error {
+  background: var(--accent-error-subtle);
+  color: var(--accent-error);
+}
+
+/* ===== Action Bar ===== */
+.action-bar {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+  margin-bottom: 8px;
+}
+
+.action-button {
+  min-width: 200px;
+  height: 48px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radius-md) !important;
+  letter-spacing: 0.3px;
+}
+
+/* ===== Progress ===== */
+.progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.progress-wrapper .el-progress {
+  flex: 1;
+}
+
+.progress-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ===== Result List ===== */
 .result-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .result-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: #0d0d1a;
-  border-radius: 6px;
-  padding: 10px 12px;
+  gap: 10px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  transition: border-color 0.15s ease;
+}
+
+.result-item:hover {
+  border-color: var(--border-default);
+}
+
+.result-item.result-error {
+  border-color: var(--accent-error-subtle);
+}
+
+.result-status {
+  flex-shrink: 0;
 }
 
 .result-name {
   min-width: 140px;
-  color: #c0c0d8;
+  color: var(--text-secondary);
   font-size: 13px;
+  font-weight: 500;
 }
 
 .result-url {
   flex: 1;
 }
 
-.result-error {
-  color: #f56c6c;
+.result-error-text {
+  color: var(--accent-error);
   font-size: 13px;
 }
 
-.action-bar {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
+/* ===== Ghost Button ===== */
+.btn-ghost {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--text-secondary) !important;
 }
 
+.btn-ghost:hover {
+  background: var(--bg-elevated) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ===== URL Dialog ===== */
 .url-dialog-body {
   display: flex;
   flex-direction: column;
@@ -883,7 +1028,7 @@ function goSettings() {
 }
 
 .url-hint {
-  font-size: 12px;
-  color: #8a8aa0;
+  font-size: 12.5px;
+  color: var(--text-muted);
 }
 </style>

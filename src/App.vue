@@ -2,10 +2,15 @@
   <el-config-provider :locale="zhCn">
     <div id="app-root" class="app-wrapper dark">
       <el-container class="app-container">
-        <el-aside width="200px" class="app-sidebar">
+        <el-aside width="220px" class="app-sidebar">
           <div class="sidebar-logo">
-            <el-icon :size="28"><PictureFilled /></el-icon>
-            <span class="logo-text">MDPicSync</span>
+            <div class="logo-icon">
+              <el-icon :size="22"><PictureFilled /></el-icon>
+            </div>
+            <div class="logo-text-group">
+              <span class="logo-text">MDPicSync</span>
+              <span class="logo-subtitle">图片迁移工具</span>
+            </div>
           </div>
           <el-menu
             :default-active="activeMenu"
@@ -65,22 +70,61 @@ function handleMenuSelect(index: string) {
 </script>
 
 <style>
-/* 全局深色主题 */
+/* ===== Design Tokens ===== */
 :root {
-  --sidebar-bg: #1a1a2e;
-  --sidebar-active: #16213e;
-  --primary: #409eff;
+  /* Base */
+  --bg-base: #09090B;
+  --bg-surface: #18181B;
+  --bg-elevated: #27272A;
+  --bg-muted: #3F3F46;
+  
+  /* Borders */
+  --border-subtle: #27272A;
+  --border-default: #3F3F46;
+  
+  /* Text */
+  --text-primary: #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  
+  /* Accent - Warm Amber */
+  --accent-primary: #F59E0B;
+  --accent-primary-hover: #D97706;
+  --accent-primary-subtle: rgba(245, 158, 11, 0.12);
+  --accent-primary-glow: rgba(245, 158, 11, 0.25);
+  
+  /* Success - Teal */
+  --accent-success: #14B8A6;
+  --accent-success-subtle: rgba(20, 184, 166, 0.12);
+  
+  /* Error */
+  --accent-error: #EF4444;
+  --accent-error-subtle: rgba(239, 68, 68, 0.12);
+  
+  /* Sidebar */
+  --sidebar-bg: #0F0F12;
+  --sidebar-hover: #1C1C20;
+  --sidebar-active-bg: rgba(245, 158, 11, 0.08);
+  
+  /* Spacing */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
+/* ===== Global Reset ===== */
 html, body, #app {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #0f0f1a;
-  color: #e0e0e0;
-  font-family: 'Segoe UI', 'PingFang SC', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ===== App Layout ===== */
 .app-wrapper {
   height: 100vh;
   overflow: hidden;
@@ -90,65 +134,108 @@ html, body, #app {
   height: 100%;
 }
 
+/* ===== Sidebar ===== */
 .app-sidebar {
   background: var(--sidebar-bg) !important;
-  border-right: 1px solid #2a2a3e;
+  border-right: 1px solid var(--border-subtle);
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 20px 20px 10px;
-  color: #409eff;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 1px;
+  gap: 12px;
+  padding: 24px 20px 28px;
+}
+
+.logo-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-primary), #D97706);
+  border-radius: var(--radius-md);
+  color: #000;
+  flex-shrink: 0;
+}
+
+.logo-text-group {
+  display: flex;
+  flex-direction: column;
 }
 
 .logo-text {
-  background: linear-gradient(135deg, #409eff, #a855f7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  line-height: 1.2;
 }
 
+.logo-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  letter-spacing: 0.2px;
+}
+
+/* ===== Menu ===== */
 .sidebar-menu {
   background: transparent !important;
   border: none !important;
+  padding: 0 8px;
 }
 
 .sidebar-menu .el-menu-item {
-  color: #a0a0b8 !important;
-  border-radius: 8px;
-  margin: 4px 10px;
-  height: 42px;
-  line-height: 42px;
+  color: var(--text-secondary) !important;
+  border-radius: var(--radius-sm);
+  margin: 2px 0;
+  height: 40px;
+  line-height: 40px;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.15s ease;
 }
 
 .sidebar-menu .el-menu-item:hover {
-  background: var(--sidebar-active) !important;
-  color: #e0e0e0 !important;
+  background: var(--sidebar-hover) !important;
+  color: var(--text-primary) !important;
 }
 
 .sidebar-menu .el-menu-item.is-active {
-  background: linear-gradient(135deg, #409eff22, #a855f722) !important;
-  color: #409eff !important;
+  background: var(--sidebar-active-bg) !important;
+  color: var(--accent-primary) !important;
 }
 
+.sidebar-menu .el-menu-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  background: var(--accent-primary);
+  border-radius: 0 2px 2px 0;
+}
+
+/* ===== Main Content ===== */
 .app-main {
-  background: #0f0f1a !important;
-  padding: 24px !important;
+  background: var(--bg-base) !important;
+  padding: 28px 32px !important;
   overflow-y: auto;
 }
 
+/* ===== Footer ===== */
 .sidebar-footer {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  padding: 12px 20px;
-  border-top: 1px solid #2a2a3e;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-subtle);
   box-sizing: border-box;
 }
 
@@ -156,19 +243,166 @@ html, body, #app {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6c7a89;
-  font-size: 13px;
+  color: var(--text-muted);
+  font-size: 12.5px;
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.15s ease;
 }
 
 .github-link:hover {
-  color: #409eff;
+  color: var(--text-secondary);
 }
 
-/* Element Plus 深色覆盖 */
+/* ===== Element Plus Overrides ===== */
 .el-button--primary {
-  background: linear-gradient(135deg, #409eff, #6366f1) !important;
-  border: none !important;
+  background: var(--accent-primary) !important;
+  border-color: var(--accent-primary) !important;
+  color: #000 !important;
+  font-weight: 600;
+}
+
+.el-button--primary:hover {
+  background: var(--accent-primary-hover) !important;
+  border-color: var(--accent-primary-hover) !important;
+}
+
+.el-card {
+  --el-card-bg-color: var(--bg-surface);
+  border-color: var(--border-subtle) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+.el-card__header {
+  border-bottom-color: var(--border-subtle) !important;
+  padding: 16px 20px !important;
+}
+
+.el-card__body {
+  padding: 20px !important;
+}
+
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: var(--bg-elevated);
+  --el-table-header-text-color: var(--text-secondary);
+  --el-table-text-color: var(--text-primary);
+  --el-table-border-color: var(--border-subtle);
+  --el-table-row-hover-bg-color: var(--bg-elevated);
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.el-input__wrapper {
+  background-color: var(--bg-elevated) !important;
+  box-shadow: 0 0 0 1px var(--border-default) inset !important;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--text-muted) inset !important;
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--accent-primary) inset !important;
+}
+
+.el-input__inner {
+  color: var(--text-primary) !important;
+}
+
+.el-input__inner::placeholder {
+  color: var(--text-muted) !important;
+}
+
+.el-select__wrapper {
+  background-color: var(--bg-elevated) !important;
+  box-shadow: 0 0 0 1px var(--border-default) inset !important;
+}
+
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--text-muted) inset !important;
+}
+
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--accent-primary) inset !important;
+}
+
+.el-radio-button__inner {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-secondary) !important;
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background: var(--accent-primary-subtle) !important;
+  border-color: var(--accent-primary) !important;
+  color: var(--accent-primary) !important;
+  box-shadow: -1px 0 0 0 var(--accent-primary) inset !important;
+}
+
+.el-tag {
+  border-radius: var(--radius-sm);
+}
+
+.el-progress__text {
+  color: var(--text-primary) !important;
+}
+
+.el-dialog {
+  --el-dialog-bg-color: var(--bg-surface);
+  border-radius: var(--radius-lg) !important;
+  border: 1px solid var(--border-subtle);
+}
+
+.el-dialog__header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 16px 20px !important;
+}
+
+.el-dialog__title {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
+
+.el-dialog__body {
+  padding: 20px !important;
+}
+
+.el-textarea__inner {
+  background-color: var(--bg-elevated) !important;
+  border-color: var(--border-default) !important;
+  color: var(--text-primary) !important;
+}
+
+.el-textarea__inner:focus {
+  border-color: var(--accent-primary) !important;
+}
+
+.el-form-item__label {
+  color: var(--text-secondary) !important;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 </style>
