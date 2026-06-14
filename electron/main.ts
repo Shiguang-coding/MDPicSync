@@ -16,7 +16,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'default',
-    icon: join(__dirname, '../../public/icon.ico'),
+    icon: join(__dirname, '../../public/icon.png'),
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -100,7 +100,7 @@ function setAppMenu() {
           const win = BrowserWindow.getFocusedWindow()
           if (win) dialog.showMessageBox(win, {
             title: '关于 MDPicSync',
-            message: 'MDPicSync v0.1.0',
+            message: 'MDPicSync v1.0.0',
             detail: 'Markdown 图片备份迁移工具\n\nGitHub: https://github.com/shiguang-coding/MDPicSync',
             buttons: ['确定']
           })

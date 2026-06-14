@@ -1,14 +1,13 @@
 # MDPicSync
 
+
 > Markdown 图片备份与双向迁移工具 | 基于 Electron + Vue 3 构建
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/Shiguang-coding/MDPicSync)
-[![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Shiguang-coding/MDPicSync/blob/main/LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/Shiguang-coding/MDPicSync)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/Shiguang-coding/MDPicSync) [![License](https://img.shields.io/badge/license-MIT-green)](https://github.com/Shiguang-coding/MDPicSync/blob/main/LICENSE) [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/Shiguang-coding/MDPicSync)
 
 > 本项目基于作者此前开发的 [MarkdownImageBackupTool](https://github.com/Shiguang-coding/MarkdownImageBackupTool)（Java 命令行版本），使用 Electron + Vue 3 重新构建为桌面应用，并扩展了插件化架构、图片上传、剪贴板粘贴等功能。
 
----
+![image-20260614150419318](https://img.shiguang666.eu.org/file/1781420664740_20260614150419953.webp)
 
 ## 目录
 
@@ -91,6 +90,11 @@ npm run electron:start    # 启动 Electron（需先启动 Vite）
 npm run electron:build
 
 # 打包后的安装程序位于 release/ 目录
+
+# 指定平台构建
+npm run electron:build:win     # 仅 Windows
+npm run electron:build:mac     # 仅 macOS
+npm run electron:build:linux   # 仅 Linux
 ```
 
 ---
@@ -122,7 +126,7 @@ Cannot find module 'electron'  (或 require('electron').app 为 undefined)
    Remove-Item -Recurse -Force node_modules\electron\dist -ErrorAction SilentlyContinue
    Remove-Item node_modules\electron\path.txt -ErrorAction SilentlyContinue
    node node_modules\electron\install.js
-
+   
    # macOS / Linux
    ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ rm -rf node_modules/electron/dist node_modules/electron/path.txt
    node node_modules/electron/install.js
@@ -138,7 +142,7 @@ Cannot find module 'electron'  (或 require('electron').app 为 undefined)
    ```bash
    # 检查路径解析（应输出 .../node_modules/electron/dist/electron.exe）
    node -e "console.log(require('electron/index.js'))"
-
+   
    # 检查二进制版本（应输出 v28.3.3）
    node_modules/electron/dist/electron.exe --version    # Windows
    node_modules/electron/dist/electron --version         # macOS/Linux
@@ -363,6 +367,10 @@ MDPicSync/
 │   ├── lsky-pro.ts           # Lsky Pro 适配器
 │   ├── cf-r2.ts              # CloudFlare R2 适配器
 │   └── cf-imgbed.ts          # CloudFlare ImgBed 适配器
+├── public/                   # 静态资源（图标等）
+│   ├── icon.ico              # Windows 图标
+│   ├── icon.icns             # macOS 图标
+│   └── icon.png              # Linux 图标
 ├── dist/                     # 前端构建输出（Vite 生成）
 ├── dist-electron/            # 主进程编译输出（tsc 生成）
 ├── release/                  # 生产打包输出（electron-builder 生成）
