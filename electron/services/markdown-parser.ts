@@ -17,6 +17,8 @@ export interface ImageRef {
   type: 'inline' | 'html' | 'frontmatter'
   /** frontmatter 字段名（仅 frontmatter 类型有值） */
   field?: string
+  /** raw 在所在行中的起始列号（0-based），用于精确定位替换 */
+  colStart: number
 }
 
 export function parseImageRefs(markdown: string): ImageRef[] {
@@ -62,6 +64,7 @@ export function parseImageRefs(markdown: string): ImageRef[] {
             raw: line,
             type: 'frontmatter',
             field: fmMatch[1],
+            colStart: 0,
           })
         }
       }
@@ -78,6 +81,7 @@ export function parseImageRefs(markdown: string): ImageRef[] {
         alt: match[1],
         raw: match[0],
         type: 'inline',
+        colStart: match.index,
       })
     }
 
@@ -90,6 +94,7 @@ export function parseImageRefs(markdown: string): ImageRef[] {
         alt: '',
         raw: match[0],
         type: 'html',
+        colStart: match.index,
       })
     }
   }

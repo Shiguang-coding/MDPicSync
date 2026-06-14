@@ -25,6 +25,18 @@
               <span>图片上传</span>
             </el-menu-item>
           </el-menu>
+
+          <div class="sidebar-footer">
+            <a
+              class="github-link"
+              href="https://github.com/shiguang-coding/MDPicSync"
+              target="_blank"
+              title="访问 GitHub 仓库"
+            >
+              <el-icon :size="14"><Link /></el-icon>
+              <span>GitHub</span>
+            </a>
+          </div>
         </el-aside>
 
         <el-main class="app-main">
@@ -39,7 +51,7 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
-import { Upload, Setting, PictureFilled, UploadFilled } from '@element-plus/icons-vue'
+import { Upload, Setting, PictureFilled, UploadFilled, Link } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -128,6 +140,30 @@ html, body, #app {
   background: #0f0f1a !important;
   padding: 24px !important;
   overflow-y: auto;
+}
+
+.sidebar-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 12px 20px;
+  border-top: 1px solid #2a2a3e;
+  box-sizing: border-box;
+}
+
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6c7a89;
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.github-link:hover {
+  color: #409eff;
 }
 
 /* Element Plus 深色覆盖 */

@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem, clipboard, nativeImage } from 'electron'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { URL } from 'url'
 import { promises as fs } from 'fs'
 import { loadAdapters, findAdapter } from './services/plugin-loader'
@@ -10,10 +10,6 @@ import { logger } from './services/logger'
 const isDev = process.argv.includes('--dev') || !app.isPackaged
 
 function createWindow() {
-  const preloadPath = join(__dirname, 'preload.js')
-  console.log('[MAIN] Preload path:', preloadPath)
-  console.log('[MAIN] Preload exists:', require('fs').existsSync(preloadPath))
-
   const win = new BrowserWindow({
     width: 1100,
     height: 750,
@@ -22,7 +18,7 @@ function createWindow() {
     titleBarStyle: 'default',
     icon: join(__dirname, '../../public/icon.ico'),
     webPreferences: {
-      preload: preloadPath,
+      preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
@@ -55,7 +51,7 @@ function setAppMenu() {
     {
       label: '文件',
       submenu: [
-        { label: '的选择目录', click: () => { BrowserWindow.getFocusedWindow()?.webContents.send('menu:select-source') } },
+        { label: '选择目录', click: () => { BrowserWindow.getFocusedWindow()?.webContents.send('menu:select-source') } },
         { label: '选择输出目录', click: () => { BrowserWindow.getFocusedWindow()?.webContents.send('menu:select-output') } },
         { type: 'separator' },
         { label: '退出', role: 'quit', accelerator: 'Ctrl+Q' },
@@ -98,9 +94,16 @@ function setAppMenu() {
     {
       label: '帮助',
       submenu: [
+        { label: '访问 GitHub 仓库', click: () => { shell.openExternal('https://github.com/shiguang-coding/MDPicSync') } },
+        { type: 'separator' },
         { label: '关于 MDPicSync', click: () => {
           const win = BrowserWindow.getFocusedWindow()
-          if (win) dialog.showMessageBox(win, { title: '关于 MDPicSync', message: 'MDPicSync v0.1.0\nMarkdown 图片备份迁移工具', buttons: ['确定'] })
+          if (win) dialog.showMessageBox(win, {
+            title: '关于 MDPicSync',
+            message: 'MDPicSync v0.1.0',
+            detail: 'Markdown 图片备份迁移工具\n\nGitHub: https://github.com/shiguang-coding/MDPicSync',
+            buttons: ['确定']
+          })
         }},
       ],
     },
@@ -118,6 +121,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// 确保退出前日志缓冲区落盘
+app.on('before-quit', async () => {
+  await logger.flush()
 })
 
 // ========== IPC：目录选择 ==========
@@ -195,11 +203,21 @@ ipcMain.handle('fs:ensureDir', async (_event: any, dirPath: string) => {
 })
 
 // ========== IPC：配置存取 ==========
-const userDataPath = app.getPath('userData')
+// 配置文件路径：开发模式 → 项目根目录，生产模式 → exe 同级目录（与日志目录策略一致）
+function getAppDataDir(): string {
+  if (!app.isPackaged) {
+    // 开发模式：项目根目录
+    return join(__dirname, '..', '..')
+  }
+  // 生产模式：exe 同级目录
+  return dirname(process.execPath)
+}
+const appDataDir = getAppDataDir()
+const configPath = join(appDataDir, 'config.json')
 
 ipcMain.handle('config:get', async (_event: any, key: string) => {
   try {
-    const content = await fs.readFile(join(userDataPath, 'config.json'), 'utf-8')
+    const content = await fs.readFile(configPath, 'utf-8')
     const config = JSON.parse(content)
     return config[key] ?? null
   } catch {
@@ -210,19 +228,35 @@ ipcMain.handle('config:get', async (_event: any, key: string) => {
 ipcMain.handle('config:set', async (_event: any, key: string, value: any) => {
   let config: any = {}
   try {
-    const content = await fs.readFile(join(userDataPath, 'config.json'), 'utf-8')
+    const content = await fs.readFile(configPath, 'utf-8')
     config = JSON.parse(content)
   } catch {
     // 文件不存在
   }
   config[key] = value
-  await fs.writeFile(join(userDataPath, 'config.json'), JSON.stringify(config, null, 2), 'utf-8')
+  await fs.writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8')
 })
 
 // ========== IPC：打开日志目录 ==========
 ipcMain.handle('app:openLogDir', async () => {
   const logDir = logger.getLogDir()
   shell.openPath(logDir)
+})
+
+// ========== IPC：打开配置文件所在目录（资源管理器中定位 config.json）==========
+ipcMain.handle('app:openConfigDir', async () => {
+  // 确保文件存在，不存在则创建空对象
+  try {
+    await fs.access(configPath)
+  } catch {
+    await fs.writeFile(configPath, '{}', 'utf-8')
+  }
+  shell.showItemInFolder(configPath)
+})
+
+// ========== IPC：渲染进程日志 ==========
+ipcMain.handle('log', async (_event: any, ...args: any[]) => {
+  logger.info(['[RENDERER]', ...args].join(' '))
 })
 
 // ========== IPC：测试图床连接 ==========
@@ -253,20 +287,10 @@ ipcMain.handle('config:testConnection', async (_event: any, adapterId: string, c
   }
 })
 
-// ========== IPC：获取适配器列表（动态加载，带缓存）==========
-let _adaptersCache: any[] | null = null
-let _adaptersCacheTime = 0
-const ADAPTERS_CACHE_TTL = 30_000 // 30 秒缓存
-
+// ========== IPC：获取适配器列表（使用 plugin-loader 缓存的实例）==========
 ipcMain.handle('adapters:list', async (_event: any) => {
-  const now = Date.now()
-  if (_adaptersCache && (now - _adaptersCacheTime) < ADAPTERS_CACHE_TTL) {
-    return _adaptersCache
-  }
   const adapters = await loadAdapters()
-  _adaptersCache = adapters.map(a => ({ id: a.id, name: a.name, configFields: a.configFields }))
-  _adaptersCacheTime = now
-  return _adaptersCache
+  return adapters.map(a => ({ id: a.id, name: a.name, configFields: a.configFields }))
 })
 // ========== IPC：上传图片到图床 ==========
 ipcMain.handle('upload:images', async (_event: any, opts: {

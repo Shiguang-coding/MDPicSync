@@ -24,10 +24,9 @@ release/
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
 
 # OS files
+.DS_Store
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
@@ -58,3 +57,14 @@ coverage/
 .workbuddy/
 test-electron.js
 test-electron2.js
+test-e3.js
+test-e4.js
+
+# Config files with sensitive data
+config.json
+
+# npm cache
+.npm-cache/
+
+# Test directory
+test/

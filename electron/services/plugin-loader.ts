@@ -8,7 +8,15 @@ import { IImageBedAdapter } from '../../plugins/base-adapter'
  */
 const pluginsDir = path.resolve(__dirname, '../../plugins')
 
+/** 缓存的适配器实例，避免每次调用都重新 require 和实例化 */
+let _cachedAdapters: IImageBedAdapter[] | null = null
+
 export async function loadAdapters(): Promise<IImageBedAdapter[]> {
+  // 如果已有缓存，直接返回，保持实例共享（如 Lsky Pro 的 token 状态）
+  if (_cachedAdapters) {
+    return _cachedAdapters
+  }
+
   const adapters: IImageBedAdapter[] = []
 
   try {
@@ -42,7 +50,15 @@ export async function loadAdapters(): Promise<IImageBedAdapter[]> {
     console.error('读取插件目录失败', e)
   }
 
+  _cachedAdapters = adapters
   return adapters
+}
+
+/**
+ * 清除适配器缓存（用于开发时热重载，或强制重新加载）
+ */
+export function clearAdapterCache(): void {
+  _cachedAdapters = null
 }
 
 /**

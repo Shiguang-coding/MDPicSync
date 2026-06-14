@@ -1,9 +1,9 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { S3Client, PutObjectCommand, HeadBucketCommand } from '@aws-sdk/client-s3'
 import axios from 'axios'
 import https from 'https'
 import fs from 'fs/promises'
 import path from 'path'
+import crypto from 'crypto'
 import { IImageBedAdapter, ImageUploadResult, ImageDownloadResult, ImageBedConfigField, ValidateResult } from './base-adapter'
 
 export class CfR2Adapter implements IImageBedAdapter {
@@ -19,15 +19,51 @@ export class CfR2Adapter implements IImageBedAdapter {
     { key: 'pathPrefix', label: '上传路径前缀', type: 'text', placeholder: 'md-images（留空则为根目录）', required: false },
   ]
 
-  // 方案 B：连接复用
+  // 连接复用
   private agent = new https.Agent({ keepAlive: true, maxSockets: 5 })
+
+  // 缓存的 S3Client 实例及对应的配置指纹
+  private _cachedClient: S3Client | null = null
+  private _clientConfigHash: string = ''
+
+  /**
+   * 根据配置生成指纹，用于判断是否需要重建 Client
+   */
+  private getConfigHash(config: Record<string, string>): string {
+    return `${config['endpoint']}|${config['accessKey']}|${config['secretKey']}`
+  }
+
+  /**
+   * 获取或创建 S3Client 实例（相同配置时复用）
+   */
+  private getClient(config: Record<string, string>): S3Client {
+    const hash = this.getConfigHash(config)
+    if (this._cachedClient && this._clientConfigHash === hash) {
+      return this._cachedClient
+    }
+
+    // 销毁旧实例
+    if (this._cachedClient) {
+      this._cachedClient.destroy()
+    }
+
+    this._cachedClient = new S3Client({
+      endpoint: config['endpoint'],
+      region: 'auto',
+      credentials: {
+        accessKeyId: config['accessKey'],
+        secretAccessKey: config['secretKey'],
+      },
+    })
+    this._clientConfigHash = hash
+    return this._cachedClient
+  }
 
   /**
    * 测试连接：用 headBucket 验证 endpoint、credentials、bucket 是否有效
    */
   async validateConfig(config: Record<string, string>): Promise<ValidateResult> {
     try {
-      const { HeadBucketCommand } = await import('@aws-sdk/client-s3')
       const client = this.getClient(config)
       await client.send(new HeadBucketCommand({ Bucket: config['bucketName'] }))
       return { ok: true, warning: '' }
@@ -37,24 +73,15 @@ export class CfR2Adapter implements IImageBedAdapter {
     }
   }
 
-  private getClient(config: Record<string, string>) {
-    return new S3Client({
-      endpoint: config['endpoint'],
-      region: 'auto',
-      credentials: {
-        accessKeyId: config['accessKey'],
-        secretAccessKey: config['secretKey'],
-      },
-    })
-  }
-
   async upload(filePath: string, config: Record<string, string>): Promise<ImageUploadResult> {
     try {
       const client = this.getClient(config)
       const fileBuffer = await fs.readFile(filePath)
       const fileName = path.basename(filePath)
       const prefix = (config['pathPrefix'] || 'md-images').replace(/^\/+|\/+$/g, '')
-      const key = prefix ? `${prefix}/${Date.now()}-${fileName}` : `${Date.now()}-${fileName}`
+      // 使用随机 hex 替代 Date.now()，避免并发上传时文件名冲突
+      const uniqueId = crypto.randomBytes(4).toString('hex')
+      const key = prefix ? `${prefix}/${uniqueId}-${fileName}` : `${uniqueId}-${fileName}`
 
       await client.send(
         new PutObjectCommand({
@@ -99,6 +126,9 @@ export class CfR2Adapter implements IImageBedAdapter {
       '.gif': 'image/gif',
       '.webp': 'image/webp',
       '.svg': 'image/svg+xml',
+      '.bmp': 'image/bmp',
+      '.tiff': 'image/tiff',
+      '.tif': 'image/tiff',
     }
     return map[ext] ?? 'application/octet-stream'
   }

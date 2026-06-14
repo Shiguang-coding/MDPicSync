@@ -10,16 +10,18 @@
 
 ## 目录
 
-- [功能特性](#-功能特性)
-- [快速开始](#-快速开始)
-- [使用流程](#-使用流程)
-- [图床配置说明](#-图床配置说明)
-- [日志说明](#-日志说明)
-- [插件开发](#-插件开发)
-- [项目结构](#-项目结构)
-- [技术栈](#-技术栈)
-- [开源协议](#-开源协议)
-- [致谢](#-致谢)
+- [目录](#目录)
+  - [功能特性](#-功能特性)
+  - [快速开始](#-快速开始)
+  - [常见问题](#-常见问题)
+  - [使用流程](#-使用流程)
+  - [图床配置说明](#-图床配置说明)
+  - [日志说明](#-日志说明)
+  - [插件开发](#-插件开发)
+  - [项目结构](#-项目结构)
+  - [技术栈](#-技术栈)
+  - [开源协议](#-开源协议)
+  - [致谢](#-致谢)
 
 ---
 
@@ -57,17 +59,19 @@ cd MDPicSync
 
 # 安装依赖
 npm install
-
-# 如 Electron 下载失败，可手动下载：
-# 1. 访问 https://github.com/electron/electron/releases/tag/v28.3.3
-# 2. 下载 electron-v28.3.3-win32-x64.zip
-# 3. 解压到 node_modules/electron/dist/
-# 4. 创建 node_modules/electron/path.txt，内容：electron.exe
 ```
+
+> ⚠️ 如果 `npm install` 未安装 devDependencies（如 cross-env、concurrently 等），请确保项目根目录有 `.npmrc` 文件，或手动执行：
+> ```bash
+> npm install --omit=none
+> ```
 
 ### 开发模式
 
 ```bash
+# 编译 Electron 主进程（首次或修改 electron/ 后需执行）
+npx tsc --project tsconfig.electron.json
+
 # 同时启动 Vite 开发服务器和 Electron（推荐）
 npm run electron:dev
 
@@ -84,6 +88,78 @@ npm run electron:build
 
 # 打包后的安装程序位于 release/ 目录
 ```
+
+---
+
+## 常见问题
+
+### Electron 二进制下载失败或版本不匹配
+
+**现象**：`npm run electron:dev` 启动时报错，常见错误包括：
+
+```
+Error: spawn ...\node_modules\electron\dist\dist\electron.exe ENOENT
+```
+```
+Error: Electron failed to install correctly, please delete node_modules/electron and try installing again
+```
+```
+Cannot find module 'electron'  (或 require('electron').app 为 undefined)
+```
+
+**原因**：Electron 的 npm 包（`package.json` 声明 v28）与本地下载的二进制文件版本不一致，或 `path.txt` 内容错误导致路径解析多了一层 `dist/`。
+
+**解决方案**（按顺序尝试）：
+
+1. **设置国内镜像重新下载**：
+   ```bash
+   # Windows (PowerShell)
+   $env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+   Remove-Item -Recurse -Force node_modules\electron\dist -ErrorAction SilentlyContinue
+   Remove-Item node_modules\electron\path.txt -ErrorAction SilentlyContinue
+   node node_modules\electron\install.js
+
+   # macOS / Linux
+   ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ rm -rf node_modules/electron/dist node_modules/electron/path.txt
+   node node_modules/electron/install.js
+   ```
+
+2. **手动下载并安装**（推荐，国内网络最稳定）：
+   - 从国内镜像下载：`https://registry.npmmirror.com/-/binary/electron/v28.3.3/electron-v28.3.3-win32-x64.zip`
+   - 或从 GitHub 下载：`https://github.com/electron/electron/releases/tag/v28.3.3`
+   - 将 zip 解压后的**所有文件**覆盖到 `node_modules/electron/dist/`
+   - 确保 `node_modules/electron/path.txt` 内容为 `electron.exe`（Windows）/ `electron`（macOS/Linux），**不要包含 `dist/` 前缀**
+
+3. **验证安装是否正确**：
+   ```bash
+   # 检查路径解析（应输出 .../node_modules/electron/dist/electron.exe）
+   node -e "console.log(require('electron/index.js'))"
+
+   # 检查二进制版本（应输出 v28.3.3）
+   node_modules/electron/dist/electron.exe --version    # Windows
+   node_modules/electron/dist/electron --version         # macOS/Linux
+   ```
+
+> **注意**：`node_modules/electron/path.txt` 的值会被 `electron/index.js` 拼接为 `__dirname/dist/<path.txt内容>`，因此 path.txt 中只需写 `electron.exe`，不要写 `dist/electron.exe`，否则会导致路径变成 `dist/dist/electron.exe`。
+
+### npm install 跳过了 devDependencies
+
+**现象**：运行 `npm run electron:dev` 提示 `cross-env 不是内部或外部命令`。
+
+**原因**：npm 全局配置 `omit=dev` 会导致 devDependencies 不被安装。
+
+**解决方案**：
+
+```bash
+# 项目根目录已有 .npmrc 文件（omit=[]），确保 devDependencies 被安装
+npm install --omit=none
+```
+
+### Vite 端口被占用
+
+**现象**：`electron:dev` 启动后 Vite 使用了 5174/5175 等端口，但 `wait-on` 仍等待 5173，导致 Electron 无法连接。
+
+**解决方案**：关闭占用 5173 的进程，或在 `vite.config.ts` 中修改 `server.port` 并同步修改 `package.json` 中 `electron:dev` 脚本的 `wait-on` 端口。
 
 ---
 

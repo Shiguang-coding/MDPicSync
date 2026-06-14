@@ -43,6 +43,7 @@
         <el-form-item>
           <el-button type="primary" @click="saveConfig">保存配置</el-button>
           <el-button @click="testConnection" :loading="testing">测试连接</el-button>
+          <el-button @click="openConfigDir">打开配置文件</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -149,6 +150,19 @@ async function testConnection() {
     ElMessage.error('连接测试异常：' + e.message)
   } finally {
     testing.value = false
+  }
+}
+
+async function openConfigDir() {
+  try {
+    const api = (window as any).electronAPI
+    if (!api || !api.openConfigDir) {
+      ElMessage.error('IPC 接口未加载')
+      return
+    }
+    await api.openConfigDir()
+  } catch (e: any) {
+    ElMessage.error('打开配置目录失败：' + e.message)
   }
 }
 </script>

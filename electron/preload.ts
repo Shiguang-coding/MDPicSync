@@ -1,7 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-console.log('[PRELOAD] Script started')
-
 try {
   const api = {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
@@ -35,6 +33,7 @@ try {
       ipcRenderer.removeAllListeners('migration:log')
     },
     openLogDir: () => ipcRenderer.invoke('app:openLogDir'),
+    openConfigDir: () => ipcRenderer.invoke('app:openConfigDir'),
     testConnection: (adapterId: string, config: Record<string, string>) =>
       ipcRenderer.invoke('config:testConnection', adapterId, config),
     uploadImages: (opts: {
@@ -49,7 +48,6 @@ try {
   }
 
   contextBridge.exposeInMainWorld('electronAPI', api)
-  console.log('[PRELOAD] electronAPI exposed successfully')
 } catch (err) {
   console.error('[PRELOAD] Failed to expose electronAPI:', err)
 }

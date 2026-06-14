@@ -132,18 +132,26 @@ export async function runMigration(
     }
   )
 
-  // 应用替换
-  let newContent = content
+  // 应用替换（按行号+列号从后向前替换，避免偏移）
+  const lines = content.split('\n')
   const details: MigrationResult['details'] = []
   let successCount = 0
   let failCount = 0
+
+  // 构建（行号, 列号, 替换内容）列表，按位置从后往前排序
+  const replacements: Array<{ lineIdx: number; colStart: number; rawLen: number; replacement: string }> = []
 
   for (let i = 0; i < targetImages.length; i++) {
     const img = targetImages[i]
     const result = results[i]
 
     if (result.status === 'fulfilled') {
-      newContent = newContent.replace(result.value.originalRaw, result.value.replacement)
+      replacements.push({
+        lineIdx: img.line - 1, // ImageRef.line 是 1-based
+        colStart: img.colStart,
+        rawLen: img.raw.length,
+        replacement: result.value.replacement,
+      })
       details.push({ url: img.url, status: 'success', newUrl: result.value.replacement })
       successCount++
     } else {
@@ -151,6 +159,21 @@ export async function runMigration(
       failCount++
     }
   }
+
+  // 从后向前替换，确保前面的位置不受影响
+  replacements.sort((a, b) => {
+    if (a.lineIdx !== b.lineIdx) return b.lineIdx - a.lineIdx
+    return b.colStart - a.colStart
+  })
+
+  for (const rep of replacements) {
+    const line = lines[rep.lineIdx]
+    if (line !== undefined) {
+      lines[rep.lineIdx] = line.slice(0, rep.colStart) + rep.replacement + line.slice(rep.colStart + rep.rawLen)
+    }
+  }
+
+  const newContent = lines.join('\n')
 
   log(`   ✅ 完成: 成功 ${successCount}，失败 ${failCount}`)
 

@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron:start\"",
-    "electron:start": "electron . --dev",
+    "electron:dev": "cross-env NODE_ENV=development concurrently -k \"npm run dev\" \"cross-env NODE_ENV=development wait-on http://localhost:5173 && npm run electron:start\"",
+    "electron:start": "cross-env NODE_ENV=development electron . --dev",
     "electron:build": "npm run build && tsc --project tsconfig.electron.json && electron-builder",
     "postinstall": "echo 'Skipping postinstall'"
   },
@@ -29,6 +29,7 @@
     "@types/node": "^20.11.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "concurrently": "^8.2.2",
+    "cross-env": "^10.1.0",
     "electron": "^28.3.3",
     "electron-builder": "^24.9.0",
     "typescript": "~5.4.0",
